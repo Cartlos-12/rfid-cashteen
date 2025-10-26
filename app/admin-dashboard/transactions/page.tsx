@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from "react";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 interface TransactionItem {
   id: number;
@@ -33,6 +35,9 @@ export default function CashierTransactions() {
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const [resultMessage, setResultMessage] = useState("");
 
+  const [moreModalOpen, setMoreModalOpen] = useState(false);
+  const [moreTx, setMoreTx] = useState<Transaction | null>(null);
+
   useEffect(() => {
     fetchTransactions();
   }, []);
@@ -55,6 +60,11 @@ export default function CashierTransactions() {
   function openItems(tx: Transaction) {
     setSelectedTx(tx);
     setModalOpen(true);
+  }
+
+  function openMoreModal(tx: Transaction) {
+    setMoreTx(tx);
+    setMoreModalOpen(true);
   }
 
   function handleVoid(item: TransactionItem) {
@@ -96,6 +106,32 @@ export default function CashierTransactions() {
     }
   }
 
+  function saveTransactionToExcel(tx: Transaction) {
+  const wsData: (string | number)[][] = [["Item", "Quantity", "Price", "Line Total"]];
+
+  // Ensure items is always an array
+  (tx.items ?? []).forEach(item => {
+    const price = Number(item.price ?? 0);
+    const qty = Number(item.quantity ?? 0);
+    wsData.push([
+      item.item_name ?? "",
+      qty,
+      price,
+      Number((price * qty).toFixed(2)) // Keep it a number
+    ]);
+  });
+
+  wsData.push([]);
+  wsData.push(["Total", "", "", Number(tx.total ?? 0)]);
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(wb, ws, `Transaction_${tx.id}`);
+  const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  saveAs(new Blob([wbout], { type: "application/octet-stream" }), `Transaction_${tx.id}.xlsx`);
+}
+
+
   return (
     <div className="p-4">
       <header className="py-3 px-3 border-bottom bg-light shadow-sm mb-3">
@@ -131,7 +167,7 @@ export default function CashierTransactions() {
                     <td>
                       <div className="d-flex gap-2">
                         <button className="btn btn-sm btn-primary" onClick={() => openItems(tx)}>View Items</button>
-                        <button className="btn btn-sm btn-outline-secondary" onClick={() => alert("Open transaction details / print")}>More</button>
+                        <button className="btn btn-sm btn-outline-secondary" onClick={() => openMoreModal(tx)}>More</button>
                       </div>
                     </td>
                   </tr>
@@ -142,10 +178,10 @@ export default function CashierTransactions() {
         </div>
       </div>
 
-      {/* Items Modal */}
+      {/* View Items Modal */}
       {modalOpen && selectedTx && (
         <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '580px' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content shadow-lg border-0 rounded-4">
               <div className="modal-header bg-primary text-white rounded-top-4">
                 <h5 className="modal-title">Transaction #{selectedTx.id} — {selectedTx.user_name}</h5>
@@ -166,7 +202,7 @@ export default function CashierTransactions() {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedTx.items.map(it => (
+                      {(selectedTx.items ?? []).map(it => (
                         <tr key={it.id} className={it.voided ? "table-danger" : ""}>
                           <td>{it.item_name ?? "-"}</td>
                           <td>{it.quantity ?? 0}</td>
@@ -233,6 +269,28 @@ export default function CashierTransactions() {
               </div>
               <div className="modal-footer">
                 <button className="btn btn-primary" onClick={() => setResultModalOpen(false)}>OK</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* More Modal */}
+      {moreModalOpen && moreTx && (
+        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content shadow-lg border-0 rounded-4">
+              <div className="modal-header bg-info text-white rounded-top-4">
+                <h5 className="modal-title">Transaction #{moreTx.id}</h5>
+                <button className="btn-close btn-close-white" onClick={() => setMoreModalOpen(false)} />
+              </div>
+              <div className="modal-body">
+                <p>Transaction by <b>{moreTx.user_name}</b></p>
+                <p><b>Total:</b> ₱{Number(moreTx.total).toFixed(2)}</p>
+                <button className="btn btn-success" onClick={() => saveTransactionToExcel(moreTx)}>Save to Excel</button>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setMoreModalOpen(false)}>Close</button>
               </div>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 export default function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+
   const [reportsOpen, setReportsOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -27,8 +28,12 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
   const isReportsActive =
     pathname.includes("/admin-dashboard/transactions") || pathname.includes("/admin-dashboard/users-log");
 
-  const getButtonClass = (path: string) =>
-    `nav-link d-flex align-items-center justify-content-between ${pathname === path ? "active-link" : ""}`;
+  const navLinks = [
+    { name: "Dashboard", path: "/admin-dashboard" },
+    { name: "Register", path: "/admin-dashboard/register" },
+    { name: "Users", path: "/admin-dashboard/users" },
+    { name: "Add Item", path: "/admin-dashboard/add" },
+  ];
 
   return (
     <div className="d-flex vh-100 text-white">
@@ -44,37 +49,23 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
               backgroundColor: "rgba(255, 255, 255, 0.15)",
             }}
           >
-            <img
-              src="/logo.png"
-              alt="Logo"
-              style={{ width: "60px", height: "60px", objectFit: "contain", borderRadius:"50px"}}
-            />
+            <img src="/logo.png" alt="Logo" style={{ width: "60px", height: "60px", objectFit: "contain", borderRadius:"50px"}} />
           </div>
           <span className="fs-5 fw-bold text-white text-center">Admin Panel</span>
         </div>
         <hr className="border-light" />
 
         <ul className="nav flex-column mb-auto text-white">
-          <li>
-            <button onClick={() => router.push("/admin-dashboard")} className={getButtonClass("/admin-dashboard")}>
-              Dashboard
-            </button>
-          </li>
-          <li>
-            <button onClick={() => router.push("/admin-dashboard/register")} className={getButtonClass("/admin-dashboard/register")}>
-              Register
-            </button>
-          </li>
-          <li>
-            <button onClick={() => router.push("/admin-dashboard/users")} className={getButtonClass("/admin-dashboard/users")}>
-              Users
-            </button>
-          </li>
-          <li>
-            <button onClick={() => router.push("/admin-dashboard/add")} className={getButtonClass("/admin-dashboard/add")}>
-              Add Item
-            </button>
-          </li>
+          {navLinks.map(link => (
+            <li key={link.path}>
+              <button
+                onClick={() => router.push(link.path)}
+                className={`nav-link d-flex align-items-center justify-content-between ${pathname === link.path ? "active-link" : ""}`}
+              >
+                {link.name}
+              </button>
+            </li>
+          ))}
 
           {/* Reports Dropdown */}
           <li>
@@ -99,7 +90,6 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
                   <button
                     onClick={() => router.push("/admin-dashboard/transactions")}
                     className={`nav-link ${pathname === "/admin-dashboard/transactions" ? "active-link" : ""}`}
-                    style={{ fontSize: "15.1px" }}
                   >
                     Transactions
                   </button>
@@ -108,7 +98,6 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
                   <button
                     onClick={() => router.push("/admin-dashboard/users-log")}
                     className={`nav-link ${pathname === "/admin-dashboard/users-log" ? "active-link" : ""}`}
-                    style={{ fontSize: "15.1px" }}
                   >
                     System Logs
                   </button>
@@ -154,16 +143,38 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
 
       <style jsx>{`
         .sidebar-bg { background: #0099ff; }
-        .nav-link { position:relative; display:flex; align-items:center; justify-content:space-between; width:100%; padding:0.5rem 0.8rem; margin-bottom:0; color:#fff; border:none; background:none; cursor:pointer; transition:all 0.2s ease; text-align:left; }
-        .nav-link::after { content:''; position:absolute; bottom:0; left:10%; width:80%; height:1px; background-color: rgba(255,255,255,0.1); }
+        .nav-link {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          padding: 0.5rem 0.8rem;
+          margin-bottom: 0;
+          color: #fff;
+          border: none;
+          background: none;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: left;
+        }
+        .nav-link::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 10%;
+          width: 80%;
+          height: 1px;
+          background-color: rgba(255,255,255,0.1);
+        }
         .nav-link:hover { background-color: rgba(255,255,255,0.15); }
-        .active-link { background-color: rgba(255,255,255,0.25); color:#fff; font-weight:600; border-left:4px solid #fff; }
-        .dropdown-btn { display:flex; justify-content:space-between; align-items:center; width:100%; padding:0.5rem 0.8rem; border:none; background:none; color:#fff; cursor:pointer; }
+        .active-link { background-color: rgba(255,255,255,0.25); color: #fff; font-weight: 600; border-left: 4px solid #fff; }
+        .dropdown-btn { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0.5rem 0.8rem; border: none; background: none; color: #fff; cursor: pointer; }
         .dropdown-btn:hover { background-color: rgba(255,255,255,0.15); }
-        .arrow { transition: transform 0.3s ease; color:#fff; }
+        .arrow { transition: transform 0.3s ease; color: #fff; }
         .arrow.rotate { transform: rotate(180deg); }
-        .btn-logout { background-color:#f93f2f; border:none; color:#fff; font-weight:500; }
-        .btn-logout:hover { background-color:#ff5252; font-weight:bold; }
+        .btn-logout { background-color: #f93f2f; border: none; color: #fff; font-weight: 500; }
+        .btn-logout:hover { background-color: #ff5252; font-weight: bold; }
       `}</style>
     </div>
   );
