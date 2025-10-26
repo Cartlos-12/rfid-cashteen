@@ -107,30 +107,26 @@ export default function CashierTransactions() {
   }
 
   function saveTransactionToExcel(tx: Transaction) {
-  const wsData: (string | number)[][] = [["Item", "Quantity", "Price", "Line Total"]];
+    const wsData: (string | number)[][] = [["Item", "Quantity", "Price", "Line Total"]];
+    (tx.items ?? []).forEach(item => {
+      const price = Number(item.price ?? 0);
+      const qty = Number(item.quantity ?? 0);
+      wsData.push([
+        item.item_name ?? "",
+        qty,
+        price,
+        Number((price * qty).toFixed(2))
+      ]);
+    });
+    wsData.push([]);
+    wsData.push(["Total", "", "", Number(tx.total ?? 0)]);
 
-  // Ensure items is always an array
-  (tx.items ?? []).forEach(item => {
-    const price = Number(item.price ?? 0);
-    const qty = Number(item.quantity ?? 0);
-    wsData.push([
-      item.item_name ?? "",
-      qty,
-      price,
-      Number((price * qty).toFixed(2)) // Keep it a number
-    ]);
-  });
-
-  wsData.push([]);
-  wsData.push(["Total", "", "", Number(tx.total ?? 0)]);
-
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  XLSX.utils.book_append_sheet(wb, ws, `Transaction_${tx.id}`);
-  const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  saveAs(new Blob([wbout], { type: "application/octet-stream" }), `Transaction_${tx.id}.xlsx`);
-}
-
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, `Transaction_${tx.id}`);
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    saveAs(new Blob([wbout], { type: "application/octet-stream" }), `Transaction_${tx.id}.xlsx`);
+  }
 
   return (
     <div className="p-4">
@@ -181,11 +177,10 @@ export default function CashierTransactions() {
       {/* View Items Modal */}
       {modalOpen && selectedTx && (
         <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '580px' }}>
             <div className="modal-content shadow-lg border-0 rounded-4">
               <div className="modal-header bg-primary text-white rounded-top-4">
                 <h5 className="modal-title">Transaction #{selectedTx.id} — {selectedTx.user_name}</h5>
-                <button className="btn-close btn-close-white" onClick={() => setModalOpen(false)} />
               </div>
               <div className="modal-body">
                 <p><strong>Date:</strong> {selectedTx.created_at ? new Date(selectedTx.created_at).toLocaleString() : "-"}</p>
@@ -238,14 +233,13 @@ export default function CashierTransactions() {
             <div className="modal-content shadow-lg border-0 rounded-4">
               <div className="modal-header bg-warning text-dark rounded-top-4">
                 <h5 className="modal-title">Confirm Void</h5>
-                <button className="btn-close" onClick={() => { setVoidModalOpen(false); setPendingItem(null); }} />
               </div>
               <div className="modal-body">
                 <p>Are you sure you want to void <b>{pendingItem.item_name}</b> (qty {pendingItem.quantity})?<br/>
                 This will refund <b>₱{(Number(pendingItem.price ?? 0) * Number(pendingItem.quantity ?? 0)).toFixed(2)}</b>.</p>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => { setVoidModalOpen(false); setPendingItem(null); }}>Cancel</button>
+                <button className="btn btn-secondary" onClick={() => { setVoidModalOpen(false); setPendingItem(null); }}>Close</button>
                 <button className="btn btn-danger" onClick={confirmVoid} disabled={voiding}>
                   {voiding ? "Voiding..." : "Void"}
                 </button>
@@ -262,13 +256,12 @@ export default function CashierTransactions() {
             <div className="modal-content shadow-lg border-0 rounded-4">
               <div className="modal-header bg-success text-white rounded-top-4">
                 <h5 className="modal-title">Void Result</h5>
-                <button className="btn-close btn-close-white" onClick={() => setResultModalOpen(false)} />
               </div>
               <div className="modal-body">
                 <p>{resultMessage}</p>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-primary" onClick={() => setResultModalOpen(false)}>OK</button>
+                <button className="btn btn-primary" onClick={() => setResultModalOpen(false)}>Close</button>
               </div>
             </div>
           </div>
@@ -276,26 +269,52 @@ export default function CashierTransactions() {
       )}
 
       {/* More Modal */}
-      {moreModalOpen && moreTx && (
-        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content shadow-lg border-0 rounded-4">
-              <div className="modal-header bg-info text-white rounded-top-4">
-                <h5 className="modal-title">Transaction #{moreTx.id}</h5>
-                <button className="btn-close btn-close-white" onClick={() => setMoreModalOpen(false)} />
-              </div>
-              <div className="modal-body">
-                <p>Transaction by <b>{moreTx.user_name}</b></p>
-                <p><b>Total:</b> ₱{Number(moreTx.total).toFixed(2)}</p>
-                <button className="btn btn-success" onClick={() => saveTransactionToExcel(moreTx)}>Save to Excel</button>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setMoreModalOpen(false)}>Close</button>
-              </div>
-            </div>
+{/* More Modal */}
+{moreModalOpen && moreTx && (
+  <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
+    <div className="modal-dialog modal-dialog-centered modal-md">
+      <div className="modal-content shadow-lg border-0 rounded-4">
+        <div className="modal-header bg-info text-white rounded-top-4">
+          <h5 className="modal-title">Transaction #{moreTx.id}</h5>
+        </div>
+        <div className="modal-body">
+          <p>Transaction by <b>{moreTx.user_name}</b></p>
+          <p><b>Total:</b> ₱{Number(moreTx.total).toFixed(2)}</p>
+
+          <div style={{ maxHeight: '250px', overflowY: 'auto', marginBottom: '1rem' }}>
+            <table className="table table-hover table-sm">
+              <thead className="table-light">
+                <tr>
+                  <th>Item</th>
+                  <th>Qty</th>
+                  <th>Price</th>
+                  <th>Line Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(moreTx.items ?? []).map(item => (
+                  <tr key={item.id}>
+                    <td>{item.item_name ?? "-"}</td>
+                    <td>{item.quantity ?? 0}</td>
+                    <td>₱{Number(item.price ?? 0).toFixed(2)}</td>
+                    <td>₱{(Number(item.price ?? 0) * Number(item.quantity ?? 0)).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
+        <div className="modal-footer d-flex justify-content-between">
+          <button className="btn btn-success" onClick={() => saveTransactionToExcel(moreTx)}>
+            Save to Excel
+          </button>
+          <button className="btn btn-secondary" onClick={() => setMoreModalOpen(false)}>Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

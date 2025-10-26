@@ -19,6 +19,8 @@ export default function CashierPOS() {
   const [errorMessage, setErrorMessage] = useState("");
   const [scannedRFID, setScannedRFID] = useState("");
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
 
   const router = useRouter();
 
@@ -51,12 +53,28 @@ export default function CashierPOS() {
     }
   }
 
+  // Get unique categories
+  const categories = ["All", ...Array.from(new Set(items.map(item => item.category).filter(Boolean)))];
+
+  // Filter items based on search and category
+  const filteredItems = items.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
   // Cart management
   const addToCart = (item: Item) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id);
-      if (existing) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { ...item, quantity: 1 }];
+      if (existing) {
+        const newQuantity = existing.quantity + 1;
+        logUserAction("Add to Cart", `Added ${item.name} (now x${newQuantity})`);
+        return prev.map(i => i.id === item.id ? { ...i, quantity: newQuantity } : i);
+      } else {
+        logUserAction("Add to Cart", `Added ${item.name} x1`);
+        return [...prev, { ...item, quantity: 1 }];
+      }
     });
   };
 
@@ -165,11 +183,36 @@ export default function CashierPOS() {
     <div className="d-flex vh-100 relative">
       {/* Items List */}
       <div className="w-50 p-4 border-end bg-light overflow-auto">
-        <h2 className="mb-4">Available Items</h2>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h2 className="mb-0">Available Items</h2>
+          <button className="btn btn-success btn-sm">+ Add Item</button>
+        </div>
+        <div className="d-flex gap-2 mb-3">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Search items..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <select
+            className="form-select"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
+            {categories.map(category => (
+              <option key={category} value={category}>{category}</option>
+            ))}
+          </select>
+        </div>
         <ul className="list-group">
-          {items.map(item => (
+          {filteredItems.map(item => (
             <li key={item.id} className="list-group-item d-flex justify-content-between align-items-center">
-              <div><strong>{item.name}</strong> <br />₱{item.price.toFixed(2)}</div>
+              <div>
+                <strong>{item.name}</strong>
+                {item.category && <><br /><span className="badge bg-primary">{item.category}</span></>}
+                <br />₱{item.price.toFixed(2)}
+              </div>
               <button className="btn btn-primary btn-sm" onClick={() => addToCart(item)}>Add</button>
             </li>
           ))}
