@@ -145,7 +145,7 @@ export default function CashierTransactions() {
       {/* Items Modal */}
       {modalOpen && selectedTx && (
         <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-          <div className="modal-dialog modal-dialog-centered modal-xl">
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '580px' }}>
             <div className="modal-content shadow-lg border-0 rounded-4">
               <div className="modal-header bg-primary text-white rounded-top-4">
                 <h5 className="modal-title">Transaction #{selectedTx.id} — {selectedTx.user_name}</h5>

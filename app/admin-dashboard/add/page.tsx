@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Modal } from 'bootstrap';
+import Button from 'react-bootstrap/Button';
+import Modal from 'react-bootstrap/Modal';
 
 type Item = {
   id: number;
@@ -25,6 +26,10 @@ export default function AddItemPage() {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
   const [mounted, setMounted] = useState(false);
+
+  // Modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -78,8 +83,7 @@ export default function AddItemPage() {
   // Open Edit Modal
   const openEditModal = (item: Item) => {
     setEditForm({ id: item.id, name: item.name, price: item.price.toString(), category: item.category });
-    const modalEl = document.getElementById('editItemModal');
-    if (modalEl) new Modal(modalEl).show();
+    setShowEditModal(true);
   };
 
   // Edit Item
@@ -97,8 +101,7 @@ export default function AddItemPage() {
       if (res.ok && data.success) {
         toast.success('Item updated successfully');
         fetchItems();
-        const modalEl = document.getElementById('editItemModal');
-        Modal.getInstance(modalEl!)?.hide();
+        setShowEditModal(false);
       } else toast.error(data.message || 'Failed to update item');
     } catch (err) {
       console.error(err);
@@ -111,8 +114,7 @@ export default function AddItemPage() {
   // Delete
   const openDeleteModal = (id: number) => {
     setDeleteId(id);
-    const modalEl = document.getElementById('deleteItemModal');
-    if (modalEl) new Modal(modalEl).show();
+    setShowDeleteModal(true);
   };
 
   const handleDeleteConfirm = async () => {
@@ -130,8 +132,7 @@ export default function AddItemPage() {
       toast.error('Server error');
     } finally {
       setLoading(false);
-      const modalEl = document.getElementById('deleteItemModal');
-      Modal.getInstance(modalEl!)?.hide();
+      setShowDeleteModal(false);
     }
   };
 
@@ -160,7 +161,6 @@ export default function AddItemPage() {
         <header className="py-2 px-3 border-bottom bg-light shadow-sm mb-2">
           <h1 className="fw-bold text-primary mb-0">Canteen Item Management</h1>
         </header>
-
 
         <div className="row g-4">
           {/* Add Item */}
@@ -196,76 +196,75 @@ export default function AddItemPage() {
           </div>
 
           {/* Item Table */}
-          {/* Item Table */}
-<div className="col-lg-8">
-  <div className="card shadow rounded-4" style={{ minHeight: '500px' }}>
-    <div className="card-header d-flex justify-content-between align-items-center bg-gradient fw-bold text-black">
-      <span>Item List</span>
-      <div className="d-flex gap-2 w-50">
-        <input
-          className="form-control"
-          placeholder="Search..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className="form-select"
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-        >
-          <option value="All">All Categories</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-    </div>
-    <div className="card-body p-0" style={{ height: '540px', overflowY: 'auto' }}>
-      <table className="table table-hover mb-0 align-middle">
-        <thead className="table-primary sticky-top">
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Price</th>
-            <th>Category</th>
-            <th>Created</th>
-            <th className="text-center">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredItems.length === 0 ? (
-            <tr style={{ height: '400px' }}>
-              <td colSpan={6} className="text-center py-3 text-muted">
-                No items found.
-              </td>
-            </tr>
-          ) : (
-            filteredItems.map((item) => (
-              <tr key={item.id}>
-                <td>{item.id}</td>
-                <td>{item.name}</td>
-                <td>₱{item.price.toFixed(2)}</td>
-                <td>{categoryBadge(item.category)}</td>
-                <td>{mounted ? new Date(item.created_at).toLocaleString() : ''}</td>
-                <td className="text-center">
-                  <button className="btn btn-sm btn-primary me-1" onClick={() => openEditModal(item)}>Edit</button>
-                  <button className="btn btn-sm btn-danger" onClick={() => openDeleteModal(item.id)}>Delete</button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
+          <div className="col-lg-8">
+            <div className="card shadow rounded-4" style={{ minHeight: '500px' }}>
+              <div className="card-header d-flex justify-content-between align-items-center bg-gradient fw-bold text-black">
+                <span>Item List</span>
+                <div className="d-flex gap-2 w-50">
+                  <input
+                    className="form-control"
+                    placeholder="Search..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  <select
+                    className="form-select"
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                  >
+                    <option value="All">All Categories</option>
+                    {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="card-body p-0" style={{ height: '540px', overflowY: 'auto' }}>
+                <table className="table table-hover mb-0 align-middle">
+                  <thead className="table-primary sticky-top">
+                    <tr>
+                      <th>ID</th>
+                      <th>Name</th>
+                      <th>Price</th>
+                      <th>Category</th>
+                      <th>Created</th>
+                      <th className="text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredItems.length === 0 ? (
+                      <tr style={{ height: '400px' }}>
+                        <td colSpan={6} className="text-center py-3 text-muted">
+                          No items found.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredItems.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.id}</td>
+                          <td>{item.name}</td>
+                          <td>₱{item.price.toFixed(2)}</td>
+                          <td>{categoryBadge(item.category)}</td>
+                          <td>{mounted ? new Date(item.created_at).toLocaleString() : ''}</td>
+                          <td className="text-center">
+                            <button className="btn btn-sm btn-primary me-1" onClick={() => openEditModal(item)}>Edit</button>
+                            <button className="btn btn-sm btn-danger" onClick={() => openDeleteModal(item.id)}>Delete</button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Edit Modal */}
-      <ModalComponent
-        id="editItemModal"
-        title="Edit Item"
-        body={
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered>
+        <Modal.Header closeButton className="bg-gradient text-white fw-bold">
+          <Modal.Title>Edit Item</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
           <form onSubmit={handleEditSubmit}>
             <div className="mb-3">
               <label className="form-label">Item Name</label>
@@ -285,56 +284,27 @@ export default function AddItemPage() {
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Saving...' : 'Save Changes'}</button>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="outline-secondary" onClick={() => setShowEditModal(false)}>Cancel</Button>
+              <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save Changes'}</Button>
             </div>
           </form>
-        }
-      />
+        </Modal.Body>
+      </Modal>
 
       {/* Delete Modal */}
-      <ModalComponent
-        id="deleteItemModal"
-        title="Confirm Delete"
-        body={<p>Are you sure you want to delete this item? This action cannot be undone.</p>}
-        confirm={{
-          text: loading ? 'Deleting...' : 'Delete',
-          className: 'btn-danger',
-          onClick: handleDeleteConfirm,
-          disabled: loading,
-        }}
-      />
-    </main>
-  );
-}
-
-// Reusable Modal Component
-type ModalProps = {
-  id: string;
-  title: string;
-  body: React.ReactNode;
-  confirm?: { text: string; className: string; onClick: () => void; disabled?: boolean };
-};
-
-function ModalComponent({ id, title, body, confirm }: ModalProps) {
-  return (
-    <div className="modal fade" id={id} tabIndex={-1} aria-labelledby={`${id}Label`} aria-hidden="true">
-      <div className="modal-dialog modal-dialog-centered">
-        <div className="modal-content rounded-4 shadow">
-          <div className="modal-header bg-gradient text-white fw-bold">
-            <h5 className="modal-title">{title}</h5>
-            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+        <Modal.Header closeButton className="bg-gradient text-white fw-bold">
+          <Modal.Title>Confirm Delete</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Are you sure you want to delete this item? This action cannot be undone.</p>
+          <div className="d-flex justify-content-end gap-2">
+            <Button variant="outline-secondary" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+            <Button variant="danger" onClick={handleDeleteConfirm} disabled={loading}>{loading ? 'Deleting...' : 'Delete'}</Button>
           </div>
-          <div className="modal-body">{body}</div>
-          {confirm && (
-            <div className="modal-footer">
-              <button type="button" className="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-              <button type="button" className={`btn ${confirm.className}`} onClick={confirm.onClick} disabled={confirm.disabled}>{confirm.text}</button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+        </Modal.Body>
+      </Modal>
+    </main>
   );
 }
