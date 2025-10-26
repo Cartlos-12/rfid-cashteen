@@ -21,16 +21,15 @@
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.545.0",
     "mysql2": "^3.14.5",
-    "next": "15.5.2",
+    "next": "^16.0.0",
     "node-thermal-printer": "^4.5.0",
     "nodemailer": "^7.0.6",
     "pdf-to-printer": "^5.6.0",
-    "printer": "^0.4.0",
-    "react": "^19.1.0",
+    "react": "^18.3.1",
     "react-bootstrap": "^2.10.10",
     "react-bootstrap-icons": "^1.11.6",
     "react-chartjs-2": "^5.3.0",
-    "react-dom": "^19.1.1",
+    "react-dom": "^18.3.1",
     "react-router-dom": "^7.8.2",
     "react-toastify": "^11.0.5",
     "serialport": "^13.0.0",
@@ -45,5 +44,18 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.2",
     "typescript": "^5"
-  }
+  },
+  "description": "",
+  "main": "hash-cashier.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cartlos-12/rfid-cashteen.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Cartlos-12/rfid-cashteen/issues"
+  },
+  "homepage": "https://github.com/Cartlos-12/rfid-cashteen#readme"
 }
