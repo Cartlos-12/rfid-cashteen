@@ -1,7 +1,8 @@
 'use client';
-import React, { useEffect } from "react";
 
-interface CartItem {
+import React from "react";
+
+export interface CartItem {
   id: number;
   name: string;
   price: number;
@@ -9,132 +10,81 @@ interface CartItem {
 }
 
 export interface ReceiptData {
-  id?: string;
+  id: string;
   customerName: string;
-  total: number;
+  oldBalance?: number;
+  newBalance?: number;
   items: CartItem[];
-  date?: string;
+  total: number;
+  date: string;
 }
 
-interface Props {
-  data: ReceiptData;
-  onClose: () => void;
-}
-
-export default function ReceiptPage({ data, onClose }: Props) {
-  // Generate fallback Receipt ID and Date
-  const receiptId =
-    data.id ||
-    `TX-${new Date()
-      .toISOString()
-      .replace(/[-:T.Z]/g, "")
-      .slice(0, 14)}`;
-
-  const formattedDate =
-    data.date ||
-    new Date().toLocaleString("en-US", {
-      month: "2-digit",
-      day: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-
-  // Auto show modal when mounted
-  useEffect(() => {
-    const modalEl = document.getElementById("receiptModal");
-    if (modalEl) {
-      const bootstrap = require("bootstrap/dist/js/bootstrap.bundle.min.js");
-      const modal = new bootstrap.Modal(modalEl);
-      modal.show();
-      modalEl.addEventListener("hidden.bs.modal", onClose);
-    }
-  }, [onClose]);
-
-  // Print handler
-  const handlePrint = () => {
-    window.print();
-  };
-
+export default function ReceiptPage({ data, onClose }: { data: ReceiptData; onClose: () => void }) {
   return (
-    <div
-      className="modal fade"
-      id="receiptModal"
-      tabIndex={-1}
-      aria-labelledby="receiptModalLabel"
-      aria-hidden="true"
-    >
-      <div className="modal-dialog modal-dialog-centered modal-lg">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title fw-bold" id="receiptModalLabel">
-              Transaction Receipt
-            </h5>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={onClose}
-            ></button>
+    <div className="modal d-block position-fixed top-0 start-0 w-100 h-100" style={{ zIndex: 1050 }}>
+      <div
+        className="position-absolute top-0 start-0 w-100 h-100"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)' }}
+        onClick={onClose}
+      />
+      <div className="modal-dialog modal-dialog-centered position-relative">
+        <div className="modal-content p-3" style={{ fontFamily: "monospace" }}>
+          <div className="modal-header justify-content-center position-relative">
+            <h5 className="modal-title fw-bold">Invoice</h5>
+            <button type="button" className="btn-close position-absolute" style={{ right: '1rem' }} onClick={onClose}></button>
           </div>
-
           <div className="modal-body">
-            <p>
-              <strong>Receipt ID:</strong> {receiptId}
-            </p>
-            <p>
-              <strong>Customer Name:</strong> {data.customerName}
-            </p>
-            <p>
-              <strong>Date:</strong> {formattedDate}
-            </p>
-
-            <table className="table table-bordered mt-3">
-              <thead className="table-light">
-                <tr>
-                  <th>Item</th>
-                  <th>Quantity</th>
-                  <th className="text-end">Price</th>
-                  <th className="text-end">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.name}</td>
-                    <td>{item.quantity}</td>
-                    <td className="text-end">
-                      ₱{item.price.toFixed(2)}
-                    </td>
-                    <td className="text-end">
-                      ₱{(item.price * item.quantity).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th colSpan={3} className="text-end">
-                    Total:
-                  </th>
-                  <th className="text-end">₱{data.total.toFixed(2)}</th>
-                </tr>
-              </tfoot>
-            </table>
+            <div className="text-center mb-3">
+              <h6 className="fw-bold mb-0">Cashteen Payment System</h6>
+              <small>Invoice</small>
+            </div>
+            <div className="mb-2">
+              <p className="mb-1"><strong>Receipt ID:</strong> {data.id}</p>
+              <p className="mb-1"><strong>Customer:</strong> {data.customerName}</p>
+              <p className="mb-1"><strong>Date:</strong> {data.date}</p>
+              {data.oldBalance !== undefined && data.newBalance !== undefined && (
+                <>
+                  <p className="mb-1"><strong>Old Balance:</strong> ₱{data.oldBalance.toFixed(2)}</p>
+                  <p className="mb-1"><strong>New Balance:</strong> ₱{data.newBalance.toFixed(2)}</p>
+                </>
+              )}
+            </div>
+            <hr />
+            <div>
+              {data.items.map(i => (
+                <div key={i.id} className="d-flex justify-content-between mb-1">
+                  <span>{i.name} x{i.quantity}</span>
+                  <span>₱{(i.price * i.quantity).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+            <hr />
+            <div className="d-flex justify-content-between fw-bold">
+              <span>Total</span>
+              <span>₱{data.total.toFixed(2)}</span>
+            </div>
+            <div className="text-center mt-3">
+              <small>Thank you for your purchase!</small>
+            </div>
           </div>
-
-          <div className="modal-footer d-flex gap-2">
+          <div className="modal-footer">
             <button
-              type="button"
-              className="btn btn-secondary flex-fill"
-              onClick={onClose}
-            >
-              Close
-            </button>
-            <button
-              type="button"
-              className="btn btn-success flex-fill"
-              onClick={handlePrint}
+              className="btn btn-success w-100"
+              onClick={async () => {
+                try {
+                  const response = await fetch("/api/print", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                  });
+                  const result = await response.json();
+                  if (response.ok && result.success) alert(result.message);
+                  else alert(result.error || "Print failed");
+                } catch (err) {
+                  console.error("Print error:", err);
+                  alert("Failed to print receipt");
+                }
+              }}
             >
               Print
             </button>

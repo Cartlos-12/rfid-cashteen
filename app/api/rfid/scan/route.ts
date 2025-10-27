@@ -18,7 +18,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "RFID not found in users table" }, { status: 404 });
     }
 
-    return NextResponse.json({ customer: rows[0] });
+    // ✅ Return in expected format for frontend
+    return NextResponse.json({
+      customer: {
+        id: rows[0].id,
+        name: rows[0].name,
+        rfid: rows[0].rfid,
+        balance: rows[0].balance,
+      }
+    });
   } catch (error: any) {
     console.error("RFID Scan Error:", error);
     return NextResponse.json({ error: "Failed to fetch RFID data" }, { status: 500 });

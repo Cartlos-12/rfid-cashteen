@@ -21,7 +21,7 @@ export default function UsersLogPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(''); // For date filter
 
-  const categories = ['login', 'delete', 'update', 'payment confirmed', 'other']; // removed logout
+  const categories = ['login', 'add to cart', 'added item', 'delete', 'update', 'payment confirmed', 'other']; // removed logout
 
   // Fetch logs function
   const fetchLogs = async () => {
@@ -56,6 +56,10 @@ export default function UsersLogPage() {
     switch (action.toLowerCase()) {
       case 'login':
         return 'bg-success text-white';
+      case 'add to cart':
+        return 'bg-primary text-white';
+      case 'added item':
+        return 'bg-primary text-white';
       case 'delete':
         return 'bg-danger text-white';
       case 'payment confirmed':
