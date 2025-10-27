@@ -83,7 +83,7 @@ export default function CashierDashboard() {
   return (
     <div className="d-flex vh-100">
       {/* Sidebar */}
-      <aside className="bg-dark text-light p-3 d-flex flex-column" style={{ width: "250px" }}>
+      <aside className="bg-dark text-light p-3 d-flex flex-column" style={{ width: "230px" }}>
         <h4 className="mb-4">Cashier Panel</h4>
         <ul className="nav flex-column flex-grow-1">
           {menu.map(item => (
