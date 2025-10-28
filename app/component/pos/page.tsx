@@ -4,8 +4,14 @@ import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReceiptPage, { ReceiptData } from "../../component/receipt/page";
 
+// Dummy function to simulate system logging
+const logSystemAccess = (user: string, action: string, details: string) => {
+  console.log(`[SYSTEM LOG] User: ${user}, Action: ${action}, Details: ${details}`);
+};
+
 export default function CashierPOS() {
   const router = useRouter();
+  const currentUser = "cashier"; // Replace with actual logged-in user logic
 
   const [items, setItems] = useState([]);
   const [cart, setCart] = useState([]);
@@ -75,12 +81,15 @@ export default function CashierPOS() {
       return matchesSearch && matchesCategory;
     });
 
-  const addToCart = (item) =>
+  // Add to cart
+  const addToCart = (item) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id);
       if (existing) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, { ...item, quantity: 1 }];
     });
+    logSystemAccess(currentUser, "Add to Cart", `Added "${item.name}" to cart`);
+  };
 
   const removeFromCart = (id) => setCart(prev => prev.filter(i => i.id !== id));
   const getTotal = () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -152,33 +161,63 @@ export default function CashierPOS() {
     }
   };
 
-  const confirmPayment = () => {
-    if (!customer) return;
-    const total = getTotal();
-    const newBalance = (customer.balance || 0) - total;
+  // Confirm Payment
+  const confirmPayment = async () => {
+    if (!customer || cart.length === 0) return;
 
-    const payload: ReceiptData = {
-      id: `TX-${Date.now()}`,
-      customerName: customer.name,
-      oldBalance: customer.balance,
-      newBalance,
-      items: cart,
-      total,
-      date: new Date().toLocaleString(),
-    };
+    logSystemAccess(currentUser, "Confirm Payment", `Processing payment of ₱${getTotal().toFixed(2)} for ${customer.name}`);
 
-    setCart([]);
-    setShowRFIDModal(false);
-    setReceiptData(payload);
-    setShowReceiptModal(true);
+    const checkoutPayload = { customerId: customer.id, cart };
+
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checkoutPayload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setShowInvalidModal(true);
+        logSystemAccess(currentUser, "Confirm Payment Failed", data.error || "Checkout failed");
+        return;
+      }
+
+      const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const payload: ReceiptData = {
+        id: `TX-${Date.now()}`,
+        customerName: customer.name,
+        oldBalance: customer.balance || 0,
+        newBalance: data.newBalance,
+        items: cart,
+        total,
+        date: new Date().toLocaleString(),
+      };
+
+      setCart([]);
+      setShowRFIDModal(false);
+      setCustomer({ ...customer, balance: data.newBalance });
+      setReceiptData(payload);
+      setShowReceiptModal(true);
+
+      logSystemAccess(currentUser, "Confirm Payment Success", `Payment successful. New balance: ₱${data.newBalance}`);
+    } catch (err: any) {
+      setShowFailureModal(true);
+      setErrorMessage(err.message || "Checkout failed.");
+      logSystemAccess(currentUser, "Confirm Payment Error", err.message);
+    }
   };
 
+  // Add Item
   const handleAddItem = async () => {
+    logSystemAccess(currentUser, "Add Item Attempt", `Attempting to add item: ${addName}, Price: ${addPrice}, Category: ${addCategory}`);
     if (!addName || !addPrice || !addCategory) {
       setErrorMessage("Please fill in all fields.");
       setShowFailureModal(true);
       return;
     }
+
     setIsAdding(true);
     try {
       const res = await fetch("/api/cashier/items", {
@@ -192,12 +231,14 @@ export default function CashierPOS() {
       setShowAddModal(false);
       setShowSuccessModal(true);
       setAddName(""); setAddPrice(""); setAddCategory("");
+
+      logSystemAccess(currentUser, "Add Item Success", `Added "${data.item.name}" (₱${data.item.price.toFixed(2)})`);
     } catch (err) {
       setErrorMessage(err.message || "An error occurred while adding the item.");
       setShowFailureModal(true);
+      logSystemAccess(currentUser, "Add Item Failed", err.message);
     } finally { setIsAdding(false); }
   };
-
   return (
     <div className="container-fluid p-0 pt-0 h-100">
       <div className="row h-100">
@@ -271,30 +312,113 @@ export default function CashierPOS() {
         </div>
       </div>
 
-       {/* Modals */}
-      {showAddModal && (
-        <ModalWrapper onClose={() => setShowAddModal(false)}>
-          <h5 className="mb-3">Add Item</h5>
-          <input className="form-control mb-2" placeholder="Name" value={addName} onChange={e => setAddName(e.target.value)} />
-          <input className="form-control mb-2" placeholder="Price" type="number" value={addPrice} onChange={e => setAddPrice(e.target.value)} />
-          <input className="form-control mb-2" placeholder="Category" value={addCategory} onChange={e => setAddCategory(e.target.value)} />
-          <button className="btn btn-primary w-100 mt-2" onClick={handleAddItem} disabled={isAdding}>{isAdding ? "Adding..." : "Add"}</button>
-        </ModalWrapper>
-      )}
+     {/* Add Item Modal */}
+{showAddModal && (
+  <div
+    className="modal d-block"
+    tabIndex={-1}
+    style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+  >
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content p-3 border-0 rounded-4 shadow-lg">
+        <div className="card shadow-none border-0">
+          <div className="card-header bg-gradient fw-bold text-black">
+            Add New Item
+          </div>
+          <div className="card-body">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAddItem();
+                // logSystemAccess("Cashier submitted Add Item form");
+              }}
+            >
+              <div className="mb-3">
+                <label className="form-label">Item Name</label>
+                <input
+                  className="form-control"
+                  placeholder="Enter item name"
+                  value={addName}
+                  onChange={(e) => setAddName(e.target.value)}
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Price</label>
+                <div className="input-group">
+                  <span className="input-group-text">₱</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    placeholder="0.00"
+                    value={addPrice}
+                    onChange={(e) => setAddPrice(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Category</label>
+                <select
+                  className="form-select"
+                  value={addCategory}
+                  onChange={(e) => setAddCategory(e.target.value)}
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="d-flex gap-2">
+                <div className="mb-3 w-100 d-flex justify-content-end gap-2">
+  <button
+    type="button"
+    className="btn btn-secondary"
+    onClick={() => {
+      setShowAddModal(false);
+      // logSystemAccess("Cashier closed Add Item modal");
+    }}
+  >
+    Close
+  </button>
+  <button
+    type="submit"
+    className="btn btn-primary"
+    disabled={isAdding}
+  >
+    {isAdding ? "Processing..." : "Add Item"}
+  </button>
+</div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
       {showSuccessModal && <ModalMessage title="Success!" message="Item added successfully." onClose={() => setShowSuccessModal(false)} />}
       {showFailureModal && <ModalMessage title="Error" message={errorMessage} onClose={() => setShowFailureModal(false)} />}
       {showRFIDModal && (
-        <ModalWrapper onClose={() => setShowRFIDModal(false)}>
-          <h5>Scan RFID Card</h5>
-          <p>{rfidBufferDisplay || (scanningRFID ? "Waiting for scan..." : "")}</p>
-          {customer && <div className="mt-2">Customer: {customer.name} | Balance: ₱{customer.balance.toFixed(2)}</div>}
-          <div className="mt-3">
-            {customer && customer.balance >= getTotal() && <button className="btn btn-success w-100" onClick={confirmPayment}>Confirm Payment</button>}
-            <button className="btn btn-secondary w-100 mt-2" onClick={() => setShowRFIDModal(false)}>Cancel</button>
-          </div>
-        </ModalWrapper>
+  <ModalWrapper onClose={() => setShowRFIDModal(false)}>
+    <h5>Scan RFID Card</h5>
+    <p>{rfidBufferDisplay || (scanningRFID ? "Waiting for scan..." : "")}</p>
+    {customer && <div className="mt-2">Customer: {customer.name} | Balance: ₱{customer.balance.toFixed(2)}</div>}
+    <div className="mt-3">
+      {customer && customer.balance >= getTotal() && (
+        <button
+          className="btn btn-success w-100"
+          onClick={confirmPayment} // ✅ Updated to call the backend
+        >
+          Confirm Payment
+        </button>
       )}
+      <button className="btn btn-secondary w-100 mt-2" onClick={() => setShowRFIDModal(false)}>Cancel</button>
+    </div>
+  </ModalWrapper>
+)}
+
 
       {showLowBalanceModal && <ModalMessage title="Insufficient Balance" message="Customer has insufficient balance." onClose={() => setShowLowBalanceModal(false)} />}
       {showInvalidModal && <ModalMessage title="Invalid RFID" message="RFID not recognized." onClose={() => setShowInvalidModal(false)} />}
@@ -312,18 +436,32 @@ export default function CashierPOS() {
 // Generic modal wrapper
 function ModalWrapper({ children, onClose }) {
   return (
-    <div className="modal d-block position-fixed top-0 start-0 w-100 h-100" style={{ zIndex: 1050 }}>
+    <div
+      className="modal d-block position-fixed top-0 start-0"
+      style={{ zIndex: 1050 }}
+    >
+      {/* Dark / blurred overlay */}
       <div
         className="position-absolute top-0 start-0 w-100 h-100"
-        style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)' }}
+        style={{
+          backgroundColor: "rgba(0,0,0,0.5)",
+          backdropFilter: "blur(6px)",
+        }}
         onClick={onClose}
       />
-      <div className="modal-dialog modal-dialog-centered position-relative">
-        <div className="modal-content p-3">{children}</div>
+      {/* Centered modal */}
+      <div
+        className="modal-dialog modal-dialog-centered position-relative"
+      >
+        <div className="modal-content p-3 border-0 rounded-4 shadow-lg">
+          {children}
+        </div>
       </div>
     </div>
   );
 }
+
+
 
 // Reusable modal message
 function ModalMessage({ title, message, onClose }) {

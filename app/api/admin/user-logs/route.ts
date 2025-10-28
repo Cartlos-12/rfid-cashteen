@@ -1,50 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '../../../lib/db';
 
-export async function POST(req: NextRequest) {
-  try {
-    const { userId, userName, role, action, details } = await req.json();
-
-    if (!userId || !userName || !action) {
-      return NextResponse.json({ success: false, message: 'Missing required fields' }, { status: 400 });
-    }
-
-    await pool.execute(
-      `INSERT INTO user_logs (user_id, user_name, role, action, details) VALUES (?, ?, ?, ?, ?)`,
-      [userId, userName, role || 'cashier', action, details || null]
-    );
-
-    return NextResponse.json({ success: true, message: 'Action logged successfully' });
-  } catch (err: any) {
-    console.error('POST /api/admin/user-logs error:', err);
-    return NextResponse.json({ success: false, message: err.message || 'Server error' }, { status: 500 });
-  }
-}
-
 export async function GET(req: NextRequest) {
   try {
     const url = req.nextUrl;
-    const startDate = url.searchParams.get('startDate');
-    const endDate = url.searchParams.get('endDate');
+    const dateQuery = url.searchParams.get('date'); // single date filter (YYYY-MM-DD)
 
-    let sql = `SELECT * FROM user_logs WHERE 1=1`;
-    const params: any[] = [];
+    let startDate: string;
+    let endDate: string;
 
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
+    if (dateQuery) {
+      // If user picked a date, filter by that date
+      startDate = `${dateQuery} 00:00:00`;
+      endDate = `${dateQuery} 23:59:59`;
+    } else {
+      // Default: today
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      startDate = `${yyyy}-${mm}-${dd} 00:00:00`;
+      endDate = `${yyyy}-${mm}-${dd} 23:59:59`;
+    }
 
-    sql += ` AND DATE(created_at) >= ?`;
-    params.push(startDate || todayStr);
+    const sql = `
+      SELECT * FROM user_logs
+      WHERE created_at BETWEEN ? AND ?
+      ORDER BY created_at DESC
+      LIMIT 1000
+    `;
 
-    sql += ` AND DATE(created_at) <= ?`;
-    params.push(endDate || todayStr);
-
-    sql += ` ORDER BY created_at DESC LIMIT 1000`;
-
-    const [rows]: any = await pool.execute(sql, params);
+    const [rows]: any = await pool.execute(sql, [startDate, endDate]);
 
     const logs = rows.map((row: any) => ({
       id: row.id,

@@ -32,17 +32,19 @@ export async function POST(req: Request) {
     }
 
     // 🔹 Get customer info
-    const [userRows]: any = await conn.query(
-      "SELECT name, email, balance FROM users WHERE id = ?",
-      [customerId]
-    );
+const [userRows]: any = await conn.query(
+  "SELECT name, email, balance FROM users WHERE id = ?",
+  [customerId]
+);
 
-    if (!userRows.length) {
-      await conn.rollback();
-      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
-    }
+if (!userRows.length) {
+  await conn.rollback();
+  return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+}
 
-    const { name: customerName, email: customerEmail, balance: newBalance } = userRows[0];
+const { name: customerName, email: customerEmail } = userRows[0];
+const newBalance = Number(userRows[0].balance); // ✅ Convert to number
+
 
     // 🔹 Insert transaction
     const [transaction]: any = await conn.query(
@@ -53,14 +55,13 @@ export async function POST(req: Request) {
     // 🔹 Insert transaction items
     for (const item of cart) {
       await conn.query(
-        "INSERT INTO transaction_items (transaction_id, item_id, item_name, quantity, price, subtotal) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO transaction_items (transaction_id, item_id, item_name, quantity, price) VALUES (?, ?, ?, ?, ?)",
         [
           transaction.insertId,
           item.id,
           item.name,
           item.quantity,
           item.price,
-          item.price * item.quantity,
         ]
       );
     }
@@ -98,6 +99,12 @@ async function sendPurchaseEmail(
   total: number,
   newBalance: number
 ) {
+  // ✅ Skip if credentials missing
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn("⚠️ Email not sent: Missing SMTP credentials");
+    return;
+  }
+
   const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
@@ -167,3 +174,4 @@ async function sendPurchaseEmail(
     html,
   });
 }
+

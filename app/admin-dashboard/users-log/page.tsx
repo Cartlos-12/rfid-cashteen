@@ -19,35 +19,29 @@ export default function UsersLogPage() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('login');
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(''); // For date filter
+  const [selectedDate, setSelectedDate] = useState('');
 
-  const categories = ['login', 'add to cart', 'added item', 'delete', 'update', 'payment confirmed', 'other']; // removed logout
+  const categories = ['login', 'add to cart', 'add item', 'delete', 'update', 'payment confirmed'];
 
-  // Fetch logs function
   const fetchLogs = async () => {
-    setLoading(true);
-    try {
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const dateStr = selectedDate || `${yyyy}-${mm}-${dd}`;
+  setLoading(true);
+  try {
+    const dateStr = selectedDate || new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
-      const res = await fetch(
-        `${window.location.origin}/api/admin/user-logs?startDate=${dateStr}&endDate=${dateStr}`
-      );
-      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-      const data = await res.json();
-      setLogs(data.logs || []);
-    } catch (err) {
-      console.error('Failed to fetch user logs:', err);
-      setLogs([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const res = await fetch(
+      `${window.location.origin}/api/admin/user-logs?date=${dateStr}`
+    );
+    if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+    const data = await res.json();
+    setLogs(data.logs || []);
+  } catch (err) {
+    console.error('Failed to fetch user logs:', err);
+    setLogs([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  // Fetch logs only on mount or when date changes
   useEffect(() => {
     fetchLogs();
   }, [selectedDate]);
@@ -57,8 +51,7 @@ export default function UsersLogPage() {
       case 'login':
         return 'bg-success text-white';
       case 'add to cart':
-        return 'bg-primary text-white';
-      case 'added item':
+      case 'add item':
         return 'bg-primary text-white';
       case 'delete':
         return 'bg-danger text-white';
@@ -71,12 +64,7 @@ export default function UsersLogPage() {
 
   const filteredLogs = useMemo(() => {
     return logs
-      .filter(log => {
-        if (activeCategory === 'login') {
-          return log.action.toLowerCase() === 'login'; // removed logout
-        }
-        return log.action.toLowerCase() === activeCategory;
-      })
+      .filter(log => activeCategory === 'all' || log.action.toLowerCase() === activeCategory)
       .filter(
         log =>
           log.user_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -94,7 +82,6 @@ export default function UsersLogPage() {
         <h1 className="fw-bold text-primary mb-0">System Logs</h1>
       </header>
 
-      {/* Search + Category + Date */}
       <div className="mb-3 d-flex flex-wrap gap-2 align-items-center justify-content-between">
         <input
           type="text"
@@ -106,7 +93,7 @@ export default function UsersLogPage() {
         />
 
         <div className="d-flex gap-2 align-items-center">
-          {/* Dropdown */}
+          {/* Category Dropdown */}
           <div className="dropdown">
             <button
               className="btn btn-primary dropdown-toggle"
@@ -116,17 +103,14 @@ export default function UsersLogPage() {
             >
               Category: {activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)}
             </button>
-
             <ul
               className={`dropdown-menu${dropdownOpen ? ' show' : ''}`}
               style={{ width: '250px', maxHeight: '250px', overflowY: 'auto' }}
             >
-              {categories.map(cat => (
+              {['all', ...categories].map(cat => (
                 <li key={cat}>
                   <button
-                    className={`dropdown-item text-capitalize ${
-                      activeCategory === cat ? 'selected-category' : ''
-                    }`}
+                    className={`dropdown-item text-capitalize ${activeCategory === cat ? 'selected-category' : ''}`}
                     onClick={() => {
                       setActiveCategory(cat);
                       setDropdownOpen(false);
