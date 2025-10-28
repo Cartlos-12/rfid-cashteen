@@ -47,6 +47,9 @@ export default function CashierPOS() {
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
 
+  // Skeleton loading after payment
+  const [loadingPayment, setLoadingPayment] = useState(false);
+
   // Fetch items on mount
   useEffect(() => {
     let mounted = true;
@@ -167,6 +170,8 @@ export default function CashierPOS() {
 
     logSystemAccess(currentUser, "Confirm Payment", `Processing payment of ₱${getTotal().toFixed(2)} for ${customer.name}`);
 
+    setLoadingPayment(true); // ✅ start skeleton loading
+
     const checkoutPayload = { customerId: customer.id, cart };
 
     try {
@@ -206,6 +211,8 @@ export default function CashierPOS() {
       setShowFailureModal(true);
       setErrorMessage(err.message || "Checkout failed.");
       logSystemAccess(currentUser, "Confirm Payment Error", err.message);
+    } finally {
+      setLoadingPayment(false); // ✅ stop skeleton loading
     }
   };
 
@@ -239,8 +246,10 @@ export default function CashierPOS() {
       logSystemAccess(currentUser, "Add Item Failed", err.message);
     } finally { setIsAdding(false); }
   };
+
   return (
     <div className="container-fluid p-0 pt-0 h-100">
+      {/* Main layout */}
       <div className="row h-100">
         {/* LEFT: Items */}
         <div className="col-12 col-md-6 border-end d-flex pt-0 flex-column">
@@ -312,110 +321,118 @@ export default function CashierPOS() {
         </div>
       </div>
 
-     {/* Add Item Modal */}
-{showAddModal && (
-  <div
-    className="modal d-block"
-    tabIndex={-1}
-    style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-  >
-    <div className="modal-dialog modal-dialog-centered">
-      <div className="modal-content p-3 border-0 rounded-4 shadow-lg">
-        <div className="card shadow-none border-0">
-          <div className="card-header bg-gradient fw-bold text-black">
-            Add New Item
-          </div>
-          <div className="card-body">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleAddItem();
-                // logSystemAccess("Cashier submitted Add Item form");
-              }}
-            >
-              <div className="mb-3">
-                <label className="form-label">Item Name</label>
-                <input
-                  className="form-control"
-                  placeholder="Enter item name"
-                  value={addName}
-                  onChange={(e) => setAddName(e.target.value)}
-                />
-              </div>
-              <div className="mb-3">
-                <label className="form-label">Price</label>
-                <div className="input-group">
-                  <span className="input-group-text">₱</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    placeholder="0.00"
-                    value={addPrice}
-                    onChange={(e) => setAddPrice(e.target.value)}
-                  />
+      {/* Add Item Modal */}
+      {showAddModal && (
+        <div
+          className="modal d-block"
+          tabIndex={-1}
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content p-3 border-0 rounded-4 shadow-lg">
+              <div className="card shadow-none border-0">
+                <div className="card-header bg-gradient fw-bold text-black">
+                  Add New Item
+                </div>
+                <div className="card-body">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleAddItem();
+                    }}
+                  >
+                    <div className="mb-3">
+                      <label className="form-label">Item Name</label>
+                      <input
+                        className="form-control"
+                        placeholder="Enter item name"
+                        value={addName}
+                        onChange={(e) => setAddName(e.target.value)}
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Price</label>
+                      <div className="input-group">
+                        <span className="input-group-text">₱</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="form-control"
+                          placeholder="0.00"
+                          value={addPrice}
+                          onChange={(e) => setAddPrice(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Category</label>
+                      <select
+                        className="form-select"
+                        value={addCategory}
+                        onChange={(e) => setAddCategory(e.target.value)}
+                      >
+                        <option value="">Select a category</option>
+                        {categories.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="d-flex gap-2">
+                      <div className="mb-3 w-100 d-flex justify-content-end gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => setShowAddModal(false)}
+                        >
+                          Close
+                        </button>
+                        <button
+                          type="submit"
+                          className="btn btn-primary"
+                          disabled={isAdding}
+                        >
+                          {isAdding ? "Processing..." : "Add Item"}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
                 </div>
               </div>
-              <div className="mb-3">
-                <label className="form-label">Category</label>
-                <select
-                  className="form-select"
-                  value={addCategory}
-                  onChange={(e) => setAddCategory(e.target.value)}
-                >
-                  <option value="">Select a category</option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="d-flex gap-2">
-                <div className="mb-3 w-100 d-flex justify-content-end gap-2">
-  <button
-    type="button"
-    className="btn btn-secondary"
-    onClick={() => {
-      setShowAddModal(false);
-      // logSystemAccess("Cashier closed Add Item modal");
-    }}
-  >
-    Close
-  </button>
-  <button
-    type="submit"
-    className="btn btn-primary"
-    disabled={isAdding}
-  >
-    {isAdding ? "Processing..." : "Add Item"}
-  </button>
-</div>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       {showSuccessModal && <ModalMessage title="Success!" message="Item added successfully." onClose={() => setShowSuccessModal(false)} />}
       {showFailureModal && <ModalMessage title="Error" message={errorMessage} onClose={() => setShowFailureModal(false)} />}
       {showRFIDModal && (
-  <ModalWrapper onClose={() => setShowRFIDModal(false)}>
-    <h5>Scan RFID Card</h5>
-    <p>{rfidBufferDisplay || (scanningRFID ? "Waiting for scan..." : "")}</p>
-    {customer && <div className="mt-2">Customer: {customer.name} | Balance: ₱{customer.balance.toFixed(2)}</div>}
-    <div className="mt-3">
-      {customer && customer.balance >= getTotal() && (
-        <button
-          className="btn btn-success w-100"
-          onClick={confirmPayment} // ✅ Updated to call the backend
-        >
-          Confirm Payment
-        </button>
-      )}
-      <button className="btn btn-secondary w-100 mt-2" onClick={() => setShowRFIDModal(false)}>Cancel</button>
-    </div>
+  <ModalWrapper onClose={() => loadingPayment ? null : setShowRFIDModal(false)}>
+    {loadingPayment ? (
+      <div className="text-center py-4">
+        <div className="skeleton shimmer mb-3" style={{ height: "50px", width: "250px", borderRadius: "12px", margin: "0 auto" }} />
+        <div className="skeleton shimmer mb-2" style={{ height: "20px", width: "180px", borderRadius: "8px", margin: "0 auto" }} />
+        <div className="skeleton shimmer mb-2" style={{ height: "20px", width: "200px", borderRadius: "8px", margin: "0 auto" }} />
+        <div className="skeleton shimmer" style={{ height: "30px", width: "150px", borderRadius: "8px", margin: "0 auto" }} />
+        <p className="mt-3 fw-semibold">Processing payment...</p>
+      </div>
+    ) : (
+      <>
+        <h5>Scan RFID Card</h5>
+        <p>{rfidBufferDisplay || (scanningRFID ? "Waiting for scan..." : "")}</p>
+        {customer && <div className="mt-2">Customer: {customer.name} | Balance: ₱{customer.balance.toFixed(2)}</div>}
+        <div className="mt-3 d-flex flex-column gap-2">
+          {customer && customer.balance >= getTotal() && (
+            <button
+              className="btn btn-success w-100"
+              onClick={confirmPayment}
+            >
+              Confirm Payment
+            </button>
+          )}
+          <button className="btn btn-secondary w-100" onClick={() => setShowRFIDModal(false)}>Cancel</button>
+        </div>
+      </>
+    )}
   </ModalWrapper>
 )}
 
@@ -423,12 +440,37 @@ export default function CashierPOS() {
       {showLowBalanceModal && <ModalMessage title="Insufficient Balance" message="Customer has insufficient balance." onClose={() => setShowLowBalanceModal(false)} />}
       {showInvalidModal && <ModalMessage title="Invalid RFID" message="RFID not recognized." onClose={() => setShowInvalidModal(false)} />}
 
-      {/* Receipt modal */}
       {receiptData && showReceiptModal && (
         <ReceiptPage data={receiptData} onClose={() => setShowReceiptModal(false)} />
       )}
 
-      <style jsx>{`.skeleton { background: #e0e0e0; border-radius: 6px; height: 40px; }`}</style>
+      <style jsx>{`
+  .skeleton {
+    background: #e0e0e0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -150px;
+    height: 100%;
+    width: 150px;
+    background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(300px);
+    }
+  }
+`}</style>
     </div>
   );
 }
@@ -460,8 +502,6 @@ function ModalWrapper({ children, onClose }) {
     </div>
   );
 }
-
-
 
 // Reusable modal message
 function ModalMessage({ title, message, onClose }) {

@@ -79,7 +79,7 @@ await conn.query(
 
     return NextResponse.json({
       success: true,
-      message: 'RFID registered, user created, and parent account added successfully',
+      message: 'RFID registered and user created successfully',
     });
 
   } catch (err: any) {

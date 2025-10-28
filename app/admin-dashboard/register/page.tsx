@@ -221,7 +221,7 @@ export default function RegisterPage() {
               <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '3rem' }}></i>
             </div>
             <h5 className="fw-bold mb-2">Success!</h5>
-            <p className="text-muted mb-4">RFID has been registered and the user account created successfully.</p>
+            <p className="text-muted mb-4">User account created and email invitation has been sent successfully.</p>
             <button
               className="btn btn-success btn-lg px-4 shadow-sm"
               onClick={() => {
