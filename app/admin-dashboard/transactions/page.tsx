@@ -24,19 +24,13 @@ interface Transaction {
 export default function CashierTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [voiding, setVoiding] = useState(false);
-
   const [voidModalOpen, setVoidModalOpen] = useState(false);
   const [pendingItem, setPendingItem] = useState<TransactionItem | null>(null);
-
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const [resultMessage, setResultMessage] = useState("");
-
-  const [moreModalOpen, setMoreModalOpen] = useState(false);
-  const [moreTx, setMoreTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
     fetchTransactions();
@@ -60,11 +54,6 @@ export default function CashierTransactions() {
   function openItems(tx: Transaction) {
     setSelectedTx(tx);
     setModalOpen(true);
-  }
-
-  function openMoreModal(tx: Transaction) {
-    setMoreTx(tx);
-    setMoreModalOpen(true);
   }
 
   function handleVoid(item: TransactionItem) {
@@ -106,26 +95,30 @@ export default function CashierTransactions() {
     }
   }
 
-  function saveTransactionToExcel(tx: Transaction) {
-    const wsData: (string | number)[][] = [["Item", "Quantity", "Price", "Line Total"]];
-    (tx.items ?? []).forEach(item => {
-      const price = Number(item.price ?? 0);
-      const qty = Number(item.quantity ?? 0);
-      wsData.push([
-        item.item_name ?? "",
-        qty,
-        price,
-        Number((price * qty).toFixed(2))
-      ]);
+  function saveAllTransactionsToExcel() {
+    const wsData: (string | number)[][] = [["Transaction ID", "Student", "Date", "Item", "Quantity", "Price", "Line Total"]];
+
+    let grandTotal = 0;
+
+    transactions.forEach(tx => {
+      (tx.items ?? []).forEach(item => {
+        const price = Number(item.price ?? 0);
+        const qty = Number(item.quantity ?? 0);
+        const lineTotal = Number((price * qty).toFixed(2));
+        wsData.push([tx.id, tx.user_name ?? "-", tx.created_at ?? "-", item.item_name ?? "-", qty, price, lineTotal]);
+      });
+      grandTotal += Number(tx.total ?? 0);
+      wsData.push([]); // blank row after each transaction
     });
+
     wsData.push([]);
-    wsData.push(["Total", "", "", Number(tx.total ?? 0)]);
+    wsData.push(["Overall Total", "", "", "", "", "", grandTotal.toFixed(2)]);
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    XLSX.utils.book_append_sheet(wb, ws, `Transaction_${tx.id}`);
+    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    saveAs(new Blob([wbout], { type: "application/octet-stream" }), `Transaction_${tx.id}.xlsx`);
+    saveAs(new Blob([wbout], { type: "application/octet-stream" }), "All_Transactions.xlsx");
   }
 
   return (
@@ -134,7 +127,7 @@ export default function CashierTransactions() {
         <h1 className="fw-bold text-primary mb-0">Transactions</h1>
       </header>
 
-      <div className="card shadow-sm">
+      <div className="card shadow-sm mb-3">
         <div className="card-body p-3" style={{ height: '540px', overflowY: 'auto' }}>
           {loading ? (
             <p className="text-center py-5">Loading transactions...</p>
@@ -153,7 +146,7 @@ export default function CashierTransactions() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.slice(0, 10).map(tx => (
+                {transactions.map(tx => (
                   <tr key={tx.id}>
                     <td className="fw-bold">#{tx.id}</td>
                     <td>{tx.user_name ?? "-"}</td>
@@ -161,10 +154,7 @@ export default function CashierTransactions() {
                     <td>₱{Number(tx.total ?? 0).toFixed(2)}</td>
                     <td>{tx.created_at ? new Date(tx.created_at).toLocaleString() : "-"}</td>
                     <td>
-                      <div className="d-flex gap-2">
-                        <button className="btn btn-sm btn-primary" onClick={() => openItems(tx)}>View Items</button>
-                        <button className="btn btn-sm btn-outline-secondary" onClick={() => openMoreModal(tx)}>More</button>
-                      </div>
+                      <button className="btn btn-sm btn-primary" onClick={() => openItems(tx)}>View Items</button>
                     </td>
                   </tr>
                 ))}
@@ -172,6 +162,13 @@ export default function CashierTransactions() {
             </table>
           )}
         </div>
+      </div>
+
+      {/* Save to Excel Button Outside Table */}
+      <div className="d-flex justify-content-end mb-4">
+        <button className="btn btn-success" onClick={saveAllTransactionsToExcel}>
+          Save All to Excel
+        </button>
       </div>
 
       {/* View Items Modal */}
@@ -267,54 +264,6 @@ export default function CashierTransactions() {
           </div>
         </div>
       )}
-
-      {/* More Modal */}
-{/* More Modal */}
-{moreModalOpen && moreTx && (
-  <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-    <div className="modal-dialog modal-dialog-centered modal-md">
-      <div className="modal-content shadow-lg border-0 rounded-4">
-        <div className="modal-header bg-info text-white rounded-top-4">
-          <h5 className="modal-title">Transaction #{moreTx.id}</h5>
-        </div>
-        <div className="modal-body">
-          <p>Transaction by <b>{moreTx.user_name}</b></p>
-          <p><b>Total:</b> ₱{Number(moreTx.total).toFixed(2)}</p>
-
-          <div style={{ maxHeight: '250px', overflowY: 'auto', marginBottom: '1rem' }}>
-            <table className="table table-hover table-sm">
-              <thead className="table-light">
-                <tr>
-                  <th>Item</th>
-                  <th>Qty</th>
-                  <th>Price</th>
-                  <th>Line Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(moreTx.items ?? []).map(item => (
-                  <tr key={item.id}>
-                    <td>{item.item_name ?? "-"}</td>
-                    <td>{item.quantity ?? 0}</td>
-                    <td>₱{Number(item.price ?? 0).toFixed(2)}</td>
-                    <td>₱{(Number(item.price ?? 0) * Number(item.quantity ?? 0)).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="modal-footer d-flex justify-content-between">
-          <button className="btn btn-success" onClick={() => saveTransactionToExcel(moreTx)}>
-            Save to Excel
-          </button>
-          <button className="btn btn-secondary" onClick={() => setMoreModalOpen(false)}>Close</button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
-
     </div>
   );
 }

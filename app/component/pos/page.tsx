@@ -4,14 +4,34 @@ import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReceiptPage, { ReceiptData } from "../../component/receipt/page";
 
-// Dummy function to simulate system logging
-const logSystemAccess = (user: string, action: string, details: string) => {
-  console.log(`[SYSTEM LOG] User: ${user}, Action: ${action}, Details: ${details}`);
+// Updated system log function to match your database schema
+const logSystemAccess = (user: { id: string; name: string; role: string }, action: string, details: string) => {
+  console.log(`[SYSTEM LOG] UserID: ${user.id}, UserName: ${user.name}, Role: ${user.role}, Action: ${action}, Details: ${details}`);
+  
+  // Send log to your backend API to insert into the logs table
+
+fetch("/api/admin/user-logs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id: user.id,
+      user_name: user.name,
+      role: user.role,
+      action,
+      details
+    })
+  });
 };
 
 export default function CashierPOS() {
   const router = useRouter();
-  const currentUser = "cashier"; // Replace with actual logged-in user logic
+
+  // ✅ Replace with actual logged-in user info
+  const currentUser = { 
+    id: "1", 
+    name: "cashier",  
+    role: "cashier"   
+  };
 
   const [items, setItems] = useState([]);
   const [cart, setCart] = useState([]);
@@ -29,6 +49,7 @@ export default function CashierPOS() {
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editCategory, setEditCategory] = useState("");
+  
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -52,6 +73,7 @@ export default function CashierPOS() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showFailureModal, setShowFailureModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -61,14 +83,12 @@ export default function CashierPOS() {
   const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
 
   // Fetch items
-  useEffect(() => {
-    let mounted = true;
-    const fetchItems = async () => {
+    // ✅ Reusable fetchItems function for auto-refresh
+const fetchItemsFromAPI = async () => {
   try {
     setLoadingItems(true);
     const res = await fetch("/api/cashier/items");
     const data = await res.json();
-
     const mapped = Array.isArray(data)
       ? data.map(it => ({ ...it, price: Number(it.price) }))
       : [];
@@ -81,9 +101,9 @@ export default function CashierPOS() {
   }
 };
 
-    fetchItems();
-    return () => { mounted = false; };
-  }, []);
+    useEffect(() => {
+  fetchItemsFromAPI(); // Fetch items on mount
+}, []);
 
   const categories = [
     "All",
@@ -255,57 +275,91 @@ const fetchCustomer = async (rfid: string) => {
   };
 
   // Add, Edit, Delete Item handlers (existing code)
-  const handleAddItem = async () => {
-    logSystemAccess(currentUser, "Add Item Attempt", `Attempting to add item: ${addName}, Price: ${addPrice}, Category: ${addCategory}`);
-    if (!addName || !addPrice || !addCategory) {
-      setErrorMessage("Please fill in all fields.");
-      setShowFailureModal(true);
-      return;
-    }
+  // --- Modify handleAddItem ---
+// ✅ Call fetchItemsFromAPI after successful add
+const handleAddItem = async () => {
+  logSystemAccess(currentUser, "Add Item Attempt", `Attempting to add item: ${addName}, Price: ${addPrice}, Category: ${addCategory}`);
+  if (!addName || !addPrice || !addCategory) {
+    setErrorMessage("Please fill in all fields.");
+    setShowFailureModal(true);
+    return;
+  }
 
-    setIsAdding(true);
-    try {
-      const res = await fetch("/api/cashier/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: addName, price: Number(addPrice), category: addCategory }),
-      });
-      if (!res.ok) throw new Error("Failed to add item");
-      const data = await res.json();
-      setItems(prev => [...prev, data.item]);
-      setShowAddModal(false);
-      setShowSuccessModal(true);
-      setAddName(""); setAddPrice(""); setAddCategory("");
-      logSystemAccess(currentUser, "Add Item Success", `Added "${data.item.name}" (₱${data.item.price.toFixed(2)})`);
-    } catch (err) {
-      setErrorMessage(err.message || "An error occurred while adding the item.");
-      setShowFailureModal(true);
-      logSystemAccess(currentUser, "Add Item Failed", err.message);
-    } finally { setIsAdding(false); }
-  };
+  setIsAdding(true);
+  try {
+    const res = await fetch("/api/cashier/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: addName, price: Number(addPrice), category: addCategory }),
+    });
+    if (!res.ok) throw new Error("Failed to add item");
+    const data = await res.json();
 
-  const handleEditItem = async () => {
-    if (!selectedItem) return;
-    setIsEditing(true);
-    try {
-      const res = await fetch(`/api/cashier/items/${selectedItem.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, price: Number(editPrice), category: editCategory }),
-      });
-      if (!res.ok) throw new Error("Failed to edit item");
-      const data = await res.json();
-      setItems(prev => prev.map(i => i.id === selectedItem.id ? data.item : i));
-      setShowEditModal(false);
-      logSystemAccess(currentUser, "Edit Item Success", `Edited "${data.item.name}"`);
-    } catch (err) {
-      setErrorMessage(err.message || "Failed to edit item");
-      setShowFailureModal(true);
-      logSystemAccess(currentUser, "Edit Item Failed", err.message);
-    } finally { setIsEditing(false); }
-  };
+    // ✅ REFRESH ITEMS LIST AUTOMATICALLY
+    await fetchItemsFromAPI();
 
-  // Updated delete item handler
+    setShowAddModal(false);
+    setShowSuccessModal(true);
+    setAddName(""); setAddPrice(""); setAddCategory("");
+    logSystemAccess(currentUser, "Add Item Success", `Added "${data.item.name}" (₱${data.item.price.toFixed(2)})`);
+  } catch (err) {
+    setErrorMessage(err.message || "An error occurred while adding the item.");
+    setShowFailureModal(true);
+    logSystemAccess(currentUser, "Add Item Failed", err.message);
+  } finally { setIsAdding(false); }
+};
+
+// --- Modify handleEditItem ---
+// ✅ Call fetchItemsFromAPI after successful edit
+{/* Handle Edit with Success Modal */}
+const handleEditItemWithSuccess = async () => {
+  if (!selectedItem) return;
+  setIsEditing(true);
+  try {
+    const res = await fetch("/api/cashier/items", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: selectedItem.id,
+        name: editName || selectedItem.name,
+        price: Number(editPrice),
+        category: editCategory || selectedItem.category,
+        userId: currentUser.id,
+        userName: currentUser.name
+      })
+    });
+
+    if (!res.ok) throw new Error("Failed to edit item");
+    const data = await res.json();
+
+    // Refresh items list
+    await fetchItemsFromAPI();
+
+    // Close edit modal
+    setShowEditModal(false);
+
+    // Show success modal
+    setSuccessMessage(`Item "${data.item.name}" updated successfully!`);
+    setShowSuccessModal(true);
+
+    // Reset form
+    setSelectedItem(null);
+    setEditName(""); 
+    setEditPrice(""); 
+    setEditCategory("");
+
+    logSystemAccess(currentUser, "Edit Item Success", `Edited "${data.item.name}"`);
+  } catch (err) {
+    setErrorMessage(err.message || "Failed to edit item, check the inputed name.");
+    setShowFailureModal(true);
+    logSystemAccess(currentUser, "Edit Item Failed", err.message);
+  } finally {
+    setIsEditing(false);
+  }
+};
+
+// --- Modify handleDeleteItem ---
+// ✅ Call fetchItemsFromAPI after successful delete
 const handleDeleteItem = async () => {
   if (!selectedItem) return;
   setIsDeleting(true);
@@ -313,22 +367,20 @@ const handleDeleteItem = async () => {
     const res = await fetch(`/api/cashier/items`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: deleteItemName, userId: "123", userName: "cashier" })
+      body: JSON.stringify({ name: deleteItemName, userId: "1", userName: "cashier" })
     });
 
-    if (!res.ok) throw new Error("Failed to delete item");
+    if (!res.ok) throw new Error("Failed to delete item, check the item name.");
 
-    // Remove item from state
-    setItems(prev => prev.filter(i => i.id !== selectedItem.id));
+    // ✅ REFRESH ITEMS LIST AUTOMATICALLY
+    await fetchItemsFromAPI();
 
-    // Close delete modal and show success modal
     setShowDeleteModal(false);
     setDeleteItemName("");
     setShowDeleteSuccessModal(true);
-
     logSystemAccess(currentUser, "Delete Item Success", `Deleted "${selectedItem.name}"`);
   } catch (err) {
-    setErrorMessage(err.message || "Failed to delete item");
+    setErrorMessage(err.message || "Failed to delete item, check the item name.");
     setShowFailureModal(true);
     logSystemAccess(currentUser, "Delete Item Failed", err.message);
   } finally {
@@ -347,11 +399,11 @@ const handleDeleteItem = async () => {
           <div className="p-3 bg-light border-bottom sticky-top">
             <div className="d-flex gap-2 mb-1" style={{marginTop:'-18px'}}>
               <button className="btn btn-primary btn-sm px-3 py-2" onClick={() => setShowAddModal(true)}>+ Add Item</button>
-              <button className="btn btn-warning btn-sm px-3 py-2" onClick={() => { setSelectedItem(filteredItems[0] || null); setShowEditModal(true); }}>Edit Item</button>
+              <button className="btn btn-warning btn-sm px-3 py-2" onClick={() => setShowEditModal(true)}> Edit Item </button>
+
               <button className="btn btn-danger btn-sm px-3 py-2" onClick={() => { setSelectedItem(filteredItems[0] || null); setShowDeleteModal(true); }}>Delete Item</button>
             </div>
             <h4 className="mt-3 mb-2">Available Items</h4>
-
             <div className="d-flex flex-column gap-2 mb-0">
               <input
                 className="form-control form-control-sm"
@@ -466,42 +518,81 @@ const handleDeleteItem = async () => {
       )}
 
       {/* Edit Item Modal */}
-      {showEditModal && selectedItem && (
-        <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content p-3 border-0 rounded-4 shadow-lg">
-              <div className="card shadow-none border-0">
-                <div className="card-header bg-gradient fw-bold text-black">Edit Item</div>
-                <div className="card-body">
-                  <form onSubmit={(e) => { e.preventDefault(); handleEditItem(); }}>
-                    <div className="mb-3">
-                      <label className="form-label">Item Name</label>
-                      <input className="form-control" value={editName || selectedItem.name} onChange={(e) => setEditName(e.target.value)} />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <div className="input-group">
-                        <span className="input-group-text">₱</span>
-                        <input type="number" step="0.01" className="form-control" value={editPrice || selectedItem.price} onChange={(e) => setEditPrice(e.target.value)} />
-                      </div>
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Category</label>
-                      <select className="form-select" value={editCategory || selectedItem.category} onChange={(e) => setEditCategory(e.target.value)}>
-                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div className="d-flex justify-content-end gap-2">
-                      <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Close</button>
-                      <button type="submit" className="btn btn-warning" disabled={isEditing}>{isEditing ? "Saving..." : "Save Changes"}</button>
-                    </div>
-                  </form>
+{/* Edit Item Modal */}
+{showEditModal && (
+  <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content p-3 border-0 rounded-4 shadow-lg">
+        <div className="card shadow-none border-0">
+          <div className="card-header bg-gradient fw-bold text-black">Edit Item</div>
+          <div className="card-body">
+            {/* STEP 1: Enter item name */}
+            {!selectedItem || !selectedItem.id ? (
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const item = items.find(i => i.name.toLowerCase() === editName.trim().toLowerCase());
+                if (!item) {
+                  setErrorMessage("Item not found.");
+                  setShowFailureModal(true);
+                  return;
+                }
+                setSelectedItem(item);
+                setEditPrice(item.price);
+                setEditCategory(item.category || "");
+              }}>
+                <div className="mb-3">
+                  <label className="form-label">Enter Item Name to Edit</label>
+                  <input
+                    className="form-control"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Type the exact item name"
+                  />
                 </div>
-              </div>
-            </div>
+                <div className="d-flex justify-content-end gap-2">
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Close</button>
+                  <button type="submit" className="btn btn-warning">Confirm</button>
+                </div>
+              </form>
+            ) : (
+              // STEP 2: Edit details
+              <form onSubmit={(e) => { e.preventDefault(); handleEditItemWithSuccess(); }}>
+                <div className="mb-3">
+                  <label className="form-label">Item Name</label>
+                  <input className="form-control" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Price</label>
+                  <div className="input-group">
+                    <span className="input-group-text">₱</span>
+                    <input type="number" step="0.01" className="form-control" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} />
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Category</label>
+                  <select className="form-select" value={editCategory} onChange={(e) => setEditCategory(e.target.value)}>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="d-flex justify-content-end gap-2">
+                  <button type="button" className="btn btn-secondary" onClick={() => { 
+                    setShowEditModal(false); 
+                    setSelectedItem(null); 
+                    setEditName(""); 
+                    setEditPrice(""); 
+                    setEditCategory(""); 
+                  }}>Close</button>
+                  <button type="submit" className="btn btn-warning" disabled={isEditing}>{isEditing ? "Saving..." : "Save Changes"}</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
-      )}
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* Delete Item Modal */}
       {/* Delete Item Modal */}

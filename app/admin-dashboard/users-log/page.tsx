@@ -21,7 +21,19 @@ export default function UsersLogPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
 
-  const categories = ['login', 'add to cart', 'add item', 'delete', 'update', 'payment confirmed'];
+ const actionMap: Record<string, string[]> = {
+  all: [], // show all
+  login: ['login'],
+  'add to cart': ['add to cart'],
+  'add item': ['add item'],
+  delete: ['delete item'],
+  update: ['update item'],
+  'payment confirmed': ['payment confirmed']
+};
+
+// Define categories for dropdown (excluding 'all' since it's added manually)
+const categories = Object.keys(actionMap).filter(cat => cat !== 'all');
+
 
   const fetchLogs = async () => {
   setLoading(true);
@@ -47,34 +59,41 @@ export default function UsersLogPage() {
   }, [selectedDate]);
 
   const getBadgeClass = (action: string) => {
-    switch (action.toLowerCase()) {
-      case 'login':
-        return 'bg-success text-white';
-      case 'add to cart':
-      case 'add item':
-        return 'bg-primary text-white';
-      case 'delete':
-        return 'bg-danger text-white';
-      case 'payment confirmed':
-        return 'bg-info text-white';
-      default:
-        return 'bg-secondary text-white';
-    }
-  };
+  switch (action.toLowerCase()) {
+    case 'login':
+      return 'bg-success text-white';
+    case 'add to cart':
+    case 'add item':
+      return 'bg-primary text-white';
+    case 'delete item':
+      return 'bg-danger text-white';
+    case 'update item':
+      return 'bg-warning text-white';
+    case 'payment confirmed':
+      return 'bg-info text-white';
+    default:
+      return 'bg-secondary text-white';
+  }
+};
+
 
   const filteredLogs = useMemo(() => {
-    return logs
-      .filter(log => activeCategory === 'all' || log.action.toLowerCase() === activeCategory)
-      .filter(
-        log =>
-          log.user_name.toLowerCase().includes(search.toLowerCase()) ||
-          log.role.toLowerCase().includes(search.toLowerCase()) ||
-          log.action.toLowerCase().includes(search.toLowerCase()) ||
-          (log.details?.toLowerCase().includes(search.toLowerCase()) ?? false)
-      )
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 12);
-  }, [logs, activeCategory, search]);
+  return logs
+    .filter(log => {
+      if (activeCategory === 'all') return true;
+      const actions = actionMap[activeCategory];
+      return actions.some(a => log.action.toLowerCase() === a.toLowerCase());
+    })
+    .filter(
+      log =>
+        log.user_name.toLowerCase().includes(search.toLowerCase()) ||
+        log.role.toLowerCase().includes(search.toLowerCase()) ||
+        log.action.toLowerCase().includes(search.toLowerCase()) ||
+        (log.details?.toLowerCase().includes(search.toLowerCase()) ?? false)
+    )
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+}, [logs, activeCategory, search]);
+
 
   return (
     <div className="container-fluid py-2 vh-100 d-flex flex-column" style={{ overflowY: 'auto' }}>
@@ -153,7 +172,7 @@ export default function UsersLogPage() {
       </div>
 
       {/* Logs Table */}
-      <div className="shadow-sm rounded flex-grow-1" style={{ overflowX: 'scroll', maxHeight: '533px' }}>
+      <div className="shadow-sm rounded flex-grow-1" style={{ overflowX: 'scroll', maxHeight: '590px' }}>
         {loading ? (
           <p className="text-center text-muted py-5">Loading logs...</p>
         ) : filteredLogs.length === 0 ? (

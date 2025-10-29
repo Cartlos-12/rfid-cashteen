@@ -31,6 +31,30 @@ export async function GET() {
   }
 }
 
+// GET item by name
+export async function GET_BY_NAME(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const name = searchParams.get("name");
+
+    if (!name) {
+      return NextResponse.json({ error: "Item name is required" }, { status: 400 });
+    }
+
+    const [rows]: any = await pool.query("SELECT * FROM items WHERE name = ?", [name]);
+
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, item: rows[0] });
+  } catch (err) {
+    console.error("Error fetching item by name:", err);
+    return NextResponse.json({ error: "Failed to fetch item" }, { status: 500 });
+  }
+}
+
+
 // ------------------ POST new item ------------------
 export async function POST(req: NextRequest) {
   try {
