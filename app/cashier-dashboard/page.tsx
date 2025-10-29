@@ -155,21 +155,21 @@ export default function CashierDashboard() {
     const items: Item[] = await itemsRes.json();
     if (!Array.isArray(items)) throw new Error("API did not return an array");
 
-    // Build top 3 items
+    // Build top items using already availableItems state
     const topItems = Object.entries(itemCountMap)
-      .map(([id, qty]) => ({
-        name: items.find(i => i.id === Number(id))?.name || "Unknown",
-        quantity: qty,
-      }))
+      .map(([id, qty]) => {
+        const found = availableItems.find(i => i.id === Number(id));
+        return {
+          name: found ? found.name : `Item #${id}`,
+          quantity: qty
+        };
+      })
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 3);
 
-    // Update state safely
     setSalesSummary({ totalSales, totalTransactions, topItems });
   } catch (err) {
     console.error("Failed to fetch transactions:", err);
-
-    // Reset state safely on error
     setTransactions([]);
     setSalesSummary({ totalSales: 0, totalTransactions: 0, topItems: [] });
   }
@@ -219,20 +219,35 @@ export default function CashierDashboard() {
 
   return (
     <div className="d-flex vh-100">
-      <aside className="bg-dark text-light p-3 d-flex flex-column" style={{ width: "300px" }}>
+      <aside
+  className="bg-dark text-light p-3 d-flex flex-column"
+  style={{
+    width: "290px",
+    height: "100vh",       // full viewport height
+    position: "fixed",     // fix it on the side
+    top: 0,
+    left: 0,
+    overflowY: "auto",    // scroll if content is taller than viewport
+  }}
+>
         <h4 className="mb-4">Cashier Panel</h4>
         <ul className="nav flex-column flex-grow-1">
           {menu.map(item => (
             <li key={item.key} className="nav-item mb-2">
               <button
-                onClick={() => setActive(item.key)}
-                className={`d-flex align-items-center w-100 btn btn-sm text-start ${
-                  active === item.key ? "btn-primary" : "btn-outline-light"
-                }`}
-              >
-                <span className="me-2">{item.icon}</span>
-                {item.label}
-              </button>
+  onClick={() => setActive(item.key)}
+  className={`d-flex align-items-center w-100 btn text-start ${
+    active === item.key ? "btn-primary" : "btn-outline-light"
+  }`}
+  style={{
+    padding: "0.75rem 1rem", // bigger vertical and horizontal padding
+    fontSize: "1rem",      // slightly larger text
+    height: "43px",
+  }}
+>
+  <span className="me-3" style={{ fontSize: "1.3rem" }}>{item.icon}</span> {/* bigger icon */}
+  {item.label}
+</button>
             </li>
           ))}
         </ul>
@@ -244,50 +259,59 @@ export default function CashierDashboard() {
         </div>
       </aside>
 
-      <main className="flex-grow-1 p-4 bg-light overflow-auto">
+      <main
+  className="flex-grow-1 p-4 bg-light overflow-auto"
+  style={{
+    marginLeft: "300px",  // offset main content by sidebar width
+    height: "100vh",
+  }}
+>
         {active === "dashboard" && (
           <ProtectedComponent>
             <h2>Welcome Cashier</h2>
 
             <div className="row mb-4">
-              <div className="col-md-4 mb-3">
-                <div className="card text-white bg-primary h-100">
-                  <div className="card-body">
-                    <h5 className="card-title">
-                      <CashStack /> Total Sales
-                    </h5>
-                    <p className="card-text fs-4">₱{salesSummary.totalSales.toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-4 mb-3">
-                <div className="card text-white bg-success h-100">
-                  <div className="card-body">
-                    <h5 className="card-title">
-                      <Basket /> Transactions
-                    </h5>
-                    <p className="card-text fs-4">{salesSummary.totalTransactions}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-4 mb-3">
-                <div className="card text-white bg-warning h-100">
-                  <div className="card-body">
-                    <h5 className="card-title">Top Items</h5>
-                    <ul className="list-unstyled mb-0">
-                      {salesSummary.topItems.map((item, index) => (
-                        <li key={index}>
-                          {item.name} ({item.quantity})
-                        </li>
-                      ))}
-                      {salesSummary.topItems.length === 0 && <li>No sales yet</li>}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
+  <div className="col-md-4 mb-3">
+    <div className="card text-white h-100" style={{ backgroundColor: '#0d6efd' }}>
+      <div className="card-body">
+        <h5 className="card-title">
+          <CashStack /> Total Sales
+        </h5>
+        <p className="card-text fs-4">₱{salesSummary.totalSales.toFixed(2)}</p>
+      </div>
+    </div>
+  </div>
 
-            <p className="text-muted">Available items for today:</p>
+  <div className="col-md-4 mb-3">
+    <div className="card text-white h-100" style={{ backgroundColor: '#198754' }}>
+      <div className="card-body">
+        <h5 className="card-title">
+          <Basket /> Transactions
+        </h5>
+        <p className="card-text fs-4">{salesSummary.totalTransactions}</p>
+      </div>
+    </div>
+  </div>
+
+  <div className="col-md-4 mb-3">
+    <div className="card text-white h-100" style={{ backgroundColor: '#ffc107', color: '#000' }}>
+      <div className="card-body">
+        <h5 className="card-title">Top Items</h5>
+        <ul className="list-unstyled mb-0">
+          {salesSummary.topItems.map((item, index) => (
+            <li key={index} style={{ fontWeight: 500 }}>
+              {item.name} ({item.quantity})
+            </li>
+          ))}
+          {salesSummary.topItems.length === 0 && <li>No sales yet</li>}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+            <p className="fw-bold fs-4">Available items for today:</p>
             <div className="row">
               {availableItems.length === 0 && <p>No items available right now.</p>}
               {availableItems.map(item => (

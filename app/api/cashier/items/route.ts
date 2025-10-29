@@ -24,7 +24,7 @@ export async function GET() {
   try {
     const [rows] = await pool.query("SELECT * FROM items ORDER BY created_at DESC");
     const items = Array.isArray(rows) ? rows : [];
-    return NextResponse.json(items);
+    return NextResponse.json(items); // return array directly
   } catch (err) {
     console.error("Error fetching items:", err);
     return NextResponse.json({ error: "Failed to fetch items" }, { status: 500 });
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     // Log cashier action
     await logUserAction(userId, userName, "Add Item", `Added "${name}" (₱${price})`);
 
-    return NextResponse.json({ success: true, id: result.insertId });
+    return NextResponse.json({ success: true, id: result.insertId, item: { id: result.insertId, name, price, category } });
   } catch (err) {
     console.error("Error adding item:", err);
     return NextResponse.json({ error: "Failed to add item" }, { status: 500 });
@@ -74,7 +74,7 @@ export async function PUT(req: NextRequest) {
     // Log cashier action
     await logUserAction(userId, userName, "Update Item", `Updated "${name}" (₱${price})`);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, item: { id, name, price, category } });
   } catch (err) {
     console.error("Error updating item:", err);
     return NextResponse.json({ error: "Failed to update item" }, { status: 500 });
@@ -82,18 +82,24 @@ export async function PUT(req: NextRequest) {
 }
 
 // ------------------ DELETE item ------------------
+// ------------------ DELETE item by name ------------------
 export async function DELETE(req: NextRequest) {
   try {
-    const { userId, userName, id } = await req.json();
+    const { userId, userName, name } = await req.json();
 
-    if (!id) {
-      return NextResponse.json({ error: "Item ID is required" }, { status: 400 });
+    if (!name) {
+      return NextResponse.json({ error: "Item name is required" }, { status: 400 });
     }
 
-    await pool.query("DELETE FROM items WHERE id = ?", [id]);
+    const [rows]: any = await pool.query("SELECT * FROM items WHERE name = ?", [name]);
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
+    await pool.query("DELETE FROM items WHERE name = ?", [name]);
 
     // Log cashier action
-    await logUserAction(userId, userName, "Delete Item", `Deleted item ID ${id}`);
+    await logUserAction(userId, userName, "Delete Item", `Deleted item "${name}"`);
 
     return NextResponse.json({ success: true });
   } catch (err) {
