@@ -30,7 +30,7 @@ function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => voi
         <div className="modal-dialog modal-dialog-centered modal-md" role="document">
           <div className="modal-content p-3">
             <div className="text-center mb-3">
-              <h5 className="fw-bold mt-2">Cashteen</h5>
+              <h5 className="fw-bold mt-2">Cashteen E-receipt</h5>
               <small className="text-muted d-block">479 Magsaysay Avenue 4700, Sorsogon</small>
               <small className="text-muted mt-1 d-block">Thank you for your purchase!</small>
             </div>

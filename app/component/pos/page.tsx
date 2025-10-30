@@ -435,7 +435,7 @@ const handleDeleteItem = async () => {
                     <tr key={item.id}>
                       <td><div>{item.name}</div>{item.category && <span className="badge text-dark mt-1 fw-light-bold" style={{ fontSize: '0.75rem', backgroundColor: '#e0e0e0' }}>{item.category}</span>}</td>
                       <td>₱{Number(item.price).toFixed(2)}</td>
-                      <td><button className="btn btn-primary btn-sm py-2 px-4 mt-1" onClick={() => addToCart(item)}>Add</button></td>
+                      <td><button className="btn btn-primary btn-sm py-2 px-4 mt-1" onClick={() => addToCart(item)}>Add to Cart</button></td>
                     </tr>
                   ))
                 }

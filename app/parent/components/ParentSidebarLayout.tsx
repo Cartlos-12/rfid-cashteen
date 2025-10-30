@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import {
   PersonBadge,
   CashCoin,
@@ -10,6 +10,8 @@ import {
   Speedometer2,
   ClockHistory,
   BoxArrowRight,
+  List,
+  X,
 } from 'react-bootstrap-icons';
 
 type Student = {
@@ -27,6 +29,7 @@ interface Props {
 export default function ParentSidebarLayout({ student, children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navLinkClass = (href: string) =>
     `nav-link d-flex align-items-center gap-2 px-3 py-2 rounded-3 fw-semibold ${
@@ -46,30 +49,32 @@ export default function ParentSidebarLayout({ student, children }: Props) {
   };
 
   return (
-    <div className="d-flex" style={{ minHeight: '100vh' }}>
+    <div className="d-flex flex-column flex-md-row min-vh-100">
+      {/* Mobile top bar */}
+      <div className="d-md-none bg-primary text-white d-flex justify-content-between align-items-center px-3 py-2">
+        <button className="btn btn-sm text-white" onClick={() => setSidebarOpen(true)}>
+          <List size={24} />
+        </button>
+        <h5 className="mb-0">Parent Portal</h5>
+      </div>
+
       {/* Sidebar */}
       <aside
-        className="text-white p-4 d-flex flex-column justify-content-between"
-        style={{
-          width: '300px',
-          backgroundColor: '#148eff',
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
-        }}
+        className={`sidebar bg-primary text-white flex-shrink-0 d-flex flex-column justify-content-between p-4 position-fixed top-0 start-0 vh-100 shadow-sm ${
+          sidebarOpen ? 'open' : ''
+        }`}
       >
-        <div>
-          <h4 className="fw-bold mb-4 text-center">Parent Portal</h4>
+        {/* Close button on mobile */}
+        <button
+          className="btn btn-sm text-white d-md-none mb-3 align-self-end"
+          onClick={() => setSidebarOpen(false)}
+        >
+          <X size={24} />
+        </button>
 
+        <div>
           {/* Student Info Card */}
-          <div
-            className="card text-black mb-4 border-0 rounded-3 p-3 shadow-sm bg-white"
-            style={{
-              minHeight: '140px',
-              maxHeight: '160px',
-              overflow: 'hidden',
-            }}
-          >
+          <div className="card text-black mb-4 border-0 rounded-3 p-3 shadow-sm bg-white">
             {student ? (
               <div>
                 <div className="d-flex align-items-center mb-2">
@@ -94,7 +99,6 @@ export default function ParentSidebarLayout({ student, children }: Props) {
                 </div>
               </div>
             ) : (
-              /* Skeleton shimmer while loading */
               <div className="placeholder-glow w-100">
                 <div className="d-flex align-items-center mb-2">
                   <div
@@ -150,8 +154,57 @@ export default function ParentSidebarLayout({ student, children }: Props) {
         </button>
       </aside>
 
+      {/* Overlay for mobile when sidebar is open */}
+      <div
+        className={`overlay position-fixed top-0 start-0 w-100 h-100 ${
+          sidebarOpen ? 'show' : ''
+        }`}
+        onClick={() => setSidebarOpen(false)}
+      ></div>
+
       {/* Main Content */}
-      <main className="flex-grow-1 p-4 bg-light">{children}</main>
+      <main className="flex-grow-1 p-3 p-md-4 ms-md-250" style={{ marginLeft: '0' }}>
+        {children}
+      </main>
+
+      <style jsx>{`
+        .sidebar {
+          width: 250px;
+          z-index: 1050;
+          transform: translateX(-100%);
+          transition: transform 0.3s ease-in-out;
+        }
+
+        .sidebar.open {
+          transform: translateX(0);
+        }
+
+        .overlay {
+          background-color: rgba(0, 0, 0, 0.5);
+          opacity: 0;
+          visibility: hidden;
+          z-index: 1040;
+          transition: opacity 0.3s ease;
+        }
+
+        .overlay.show {
+          opacity: 1;
+          visibility: visible;
+        }
+
+        @media (min-width: 768px) {
+          .sidebar {
+            transform: translateX(0);
+            position: fixed;
+          }
+          .overlay {
+            display: none;
+          }
+          main {
+            margin-left: 250px;
+          }
+        }
+      `}</style>
     </div>
   );
 }

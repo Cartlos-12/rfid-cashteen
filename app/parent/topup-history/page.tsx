@@ -72,9 +72,7 @@ export default function TransactionHistoryPage() {
         <table className="table table-hover table-striped mb-0 align-middle">
           <thead className="table-primary position-sticky top-0">
             <tr className="text-center">
-              <th>ID</th>
-              <th>RFID</th>
-              <th>Email</th>
+              <th>Transaction ID</th>
               <th>Amount (₱)</th>
               <th>Wallet</th>
               <th>Date / Time</th>
@@ -91,8 +89,8 @@ export default function TransactionHistoryPage() {
               transactions.map((tx) => (
                 <tr key={tx.id}>
                   <td>{tx.id}</td>
-                  <td>{tx.rfid}</td>
-                  <td>{tx.email}</td>
+                
+                  
                   <td className="text-success fw-semibold">₱{tx.amount.toFixed(2)}</td>
                   <td>{tx.wallet}</td>
                   <td>
