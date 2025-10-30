@@ -93,7 +93,7 @@ export default function CashierTransactions() {
             <p className="text-center py-5 text-muted">No recent transactions found.</p>
           ) : (
             <table className="table table-striped table-hover align-middle mb-0">
-              <thead className="table-primary">
+              <thead className="table-secondary">
                 <tr>
                   <th>ID</th>
                   <th>Student</th>

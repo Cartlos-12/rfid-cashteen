@@ -309,8 +309,6 @@ export default function CashierDashboard() {
     </div>
   </div>
 </div>
-
-
             <p className="fw-bold fs-4">Available items for today:</p>
             <div className="row">
               {availableItems.length === 0 && <p>No items available right now.</p>}

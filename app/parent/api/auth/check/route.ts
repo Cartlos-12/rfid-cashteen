@@ -1,21 +1,29 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+// app/parent/api/auth/check/route.ts
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET || "my_super_secret_key";
 
 export async function GET() {
   try {
-    // Check if the parent session cookie exists
-    const parentSession = (await cookies()).get('parent_session');
+    const cookieStore = await cookies();
+    const token = cookieStore.get("parentToken")?.value;
 
-    if (!parentSession) {
-      return NextResponse.json({ success: false, message: 'Not authenticated' }, { status: 401 });
+    if (!token) {
+      return NextResponse.json({ success: false, message: "Not authenticated" }, { status: 401 });
     }
 
-    // Optionally, verify the token/session from your DB if you have one
-    // const valid = await verifySession(parentSession.value);
-    // if (!valid) throw new Error('Invalid session');
+    // ✅ Verify JWT
+    const decoded = jwt.verify(token, JWT_SECRET);
 
-    return NextResponse.json({ success: true, message: 'Authenticated' });
+    if (!decoded) {
+      return NextResponse.json({ success: false, message: "Invalid token" }, { status: 401 });
+    }
+
+    return NextResponse.json({ success: true, message: "Authenticated" });
   } catch (error) {
-    return NextResponse.json({ success: false, message: 'Auth check failed' }, { status: 401 });
+    console.error("Auth check error:", error);
+    return NextResponse.json({ success: false, message: "Auth check failed" }, { status: 401 });
   }
 }
