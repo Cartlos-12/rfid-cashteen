@@ -88,7 +88,7 @@ export default function CashierTransactions() {
 
   return (
     <div className="p-4">
-      <header className="py-3 px-3 border-bottom bg-light shadow-sm mb-3">
+      <header className="py-3 px-3 border-bottom bg-light shadow-sm mb-3" style={{marginTop: '-23px'}}>
         <h1 className="fw-bold text-primary mb-0">Transactions</h1>
       </header>
 

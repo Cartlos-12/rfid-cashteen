@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "../../../../lib/db";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
 const JWT_SECRET = process.env.JWT_SECRET || "my_super_secret_key";
 
 export async function POST(req: NextRequest) {
