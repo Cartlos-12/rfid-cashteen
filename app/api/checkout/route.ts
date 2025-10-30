@@ -46,25 +46,16 @@ const { name: customerName, email: customerEmail } = userRows[0];
 const newBalance = Number(userRows[0].balance); // ✅ Convert to number
 
 
-    // 🔹 Insert transaction
-    const [transaction]: any = await conn.query(
-      "INSERT INTO transactions (user_id, user_name, total, created_at) VALUES (?, ?, ?, NOW())",
-      [customerId, customerName, total]
+    // 🔹 Insert transactions for each item
+    const transactionPromises = cart.map((item: any) => 
+      conn.query(
+        "INSERT INTO transactions (user_id, user_name, item_id, item_name, quantity, price, total, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())",
+        [customerId, customerName, item.id, item.name, item.quantity, item.price, item.price * item.quantity]
+      )
     );
+    
+    const [transaction]: any = await Promise.all(transactionPromises);
 
-    // 🔹 Insert transaction items
-    for (const item of cart) {
-      await conn.query(
-        "INSERT INTO transaction_items (transaction_id, item_id, item_name, quantity, price) VALUES (?, ?, ?, ?, ?)",
-        [
-          transaction.insertId,
-          item.id,
-          item.name,
-          item.quantity,
-          item.price,
-        ]
-      );
-    }
 
     await conn.commit();
 

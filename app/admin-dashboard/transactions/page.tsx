@@ -9,14 +9,14 @@ interface TransactionItem {
   item_name: string;
   quantity: number;
   price: number;
-  voided?: boolean;
 }
 
 interface Transaction {
   id: number;
   user_id: number;
   user_name: string;
-  total: number | string;
+  total: number;
+  status: string;
   created_at: string;
   items: TransactionItem[];
 }
@@ -26,11 +26,6 @@ export default function CashierTransactions() {
   const [loading, setLoading] = useState(true);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [voiding, setVoiding] = useState(false);
-  const [voidModalOpen, setVoidModalOpen] = useState(false);
-  const [pendingItem, setPendingItem] = useState<TransactionItem | null>(null);
-  const [resultModalOpen, setResultModalOpen] = useState(false);
-  const [resultMessage, setResultMessage] = useState("");
 
   useEffect(() => {
     fetchTransactions();
@@ -56,59 +51,29 @@ export default function CashierTransactions() {
     setModalOpen(true);
   }
 
-  function handleVoid(item: TransactionItem) {
-    if (!selectedTx || item.voided) return;
-    setPendingItem(item);
-    setVoidModalOpen(true);
-  }
-
-  async function confirmVoid() {
-    if (!selectedTx || !pendingItem) return;
-    try {
-      setVoiding(true);
-      const res = await fetch("/api/transactions/void", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transactionId: selectedTx.id,
-          itemId: pendingItem.id,
-        }),
-      });
-      const result = await res.json();
-      if (res.ok && result.success) {
-        await fetchTransactions();
-        const updated = (await (await fetch("/api/transactions")).json()).find((t: Transaction) => t.id === selectedTx.id) || null;
-        setSelectedTx(updated);
-        setResultMessage(`${result.message} (Refund ₱${Number(result.refund ?? 0).toFixed(2)})`);
-      } else {
-        setResultMessage(result.error || "Void failed");
-      }
-      setResultModalOpen(true);
-    } catch (err) {
-      console.error("Void failed", err);
-      setResultMessage("Void request failed.");
-      setResultModalOpen(true);
-    } finally {
-      setVoiding(false);
-      setVoidModalOpen(false);
-      setPendingItem(null);
-    }
-  }
-
   function saveAllTransactionsToExcel() {
-    const wsData: (string | number)[][] = [["Transaction ID", "Student", "Date", "Item", "Quantity", "Price", "Line Total"]];
+    const wsData: (string | number)[][] = [
+      ["Transaction ID", "Student", "Date", "Item", "Quantity", "Price", "Line Total", "Status"]
+    ];
 
     let grandTotal = 0;
 
     transactions.forEach(tx => {
       (tx.items ?? []).forEach(item => {
-        const price = Number(item.price ?? 0);
-        const qty = Number(item.quantity ?? 0);
-        const lineTotal = Number((price * qty).toFixed(2));
-        wsData.push([tx.id, tx.user_name ?? "-", tx.created_at ?? "-", item.item_name ?? "-", qty, price, lineTotal]);
+        const lineTotal = item.price * item.quantity;
+        wsData.push([
+          tx.id,
+          tx.user_name ?? "-",
+          new Date(tx.created_at).toLocaleString(),
+          item.item_name ?? "-",
+          item.quantity,
+          item.price,
+          lineTotal,
+          tx.status ?? "completed"
+        ]);
       });
       grandTotal += Number(tx.total ?? 0);
-      wsData.push([]); // blank row after each transaction
+      wsData.push([]); // blank line after each transaction
     });
 
     wsData.push([]);
@@ -128,7 +93,7 @@ export default function CashierTransactions() {
       </header>
 
       <div className="card shadow-sm mb-3">
-        <div className="card-body p-3" style={{ height: '540px', overflowY: 'auto' }}>
+        <div className="card-body p-3" style={{ height: "540px", overflowY: "auto" }}>
           {loading ? (
             <p className="text-center py-5">Loading transactions...</p>
           ) : transactions.length === 0 ? (
@@ -140,7 +105,8 @@ export default function CashierTransactions() {
                   <th>ID</th>
                   <th>Student</th>
                   <th>Items</th>
-                  <th>Amount</th>
+                  <th>Total Amount</th>
+                  <th>Status</th>
                   <th>Date</th>
                   <th>Actions</th>
                 </tr>
@@ -152,9 +118,23 @@ export default function CashierTransactions() {
                     <td>{tx.user_name ?? "-"}</td>
                     <td>{tx.items?.length ?? 0} item{(tx.items?.length ?? 0) !== 1 ? "s" : ""}</td>
                     <td>₱{Number(tx.total ?? 0).toFixed(2)}</td>
-                    <td>{tx.created_at ? new Date(tx.created_at).toLocaleString() : "-"}</td>
                     <td>
-                      <button className="btn btn-sm btn-primary" onClick={() => openItems(tx)}>View Items</button>
+                      <span
+                        className={`badge ${
+                          tx.status === "void" ? "bg-danger" : "bg-success"
+                        }`}
+                      >
+                        {tx.status}
+                      </span>
+                    </td>
+                    <td>{new Date(tx.created_at).toLocaleString()}</td>
+                    <td>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => openItems(tx)}
+                      >
+                        View Items
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -173,16 +153,38 @@ export default function CashierTransactions() {
 
       {/* View Items Modal */}
       {modalOpen && selectedTx && (
-        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '580px' }}>
+        <div
+          className="modal fade show d-block"
+          style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: "580px" }}>
             <div className="modal-content shadow-lg border-0 rounded-4">
               <div className="modal-header bg-primary text-white rounded-top-4">
-                <h5 className="modal-title">Transaction #{selectedTx.id} — {selectedTx.user_name}</h5>
+                <h5 className="modal-title">
+                  Transaction #{selectedTx.id} — {selectedTx.user_name}
+                </h5>
               </div>
               <div className="modal-body">
-                <p><strong>Date:</strong> {selectedTx.created_at ? new Date(selectedTx.created_at).toLocaleString() : "-"}</p>
-                <p><strong>Total:</strong> ₱{Number(selectedTx.total ?? 0).toFixed(2)}</p>
-                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                <p>
+                  <strong>Date:</strong>{" "}
+                  {new Date(selectedTx.created_at).toLocaleString()}
+                </p>
+                <p>
+                  <strong>Status:</strong>{" "}
+                  <span
+                    className={`badge ${
+                      selectedTx.status === "void" ? "bg-danger" : "bg-success"
+                    }`}
+                  >
+                    {selectedTx.status}
+                  </span>
+                </p>
+                <p>
+                  <strong>Total:</strong> ₱
+                  {Number(selectedTx.total ?? 0).toFixed(2)}
+                </p>
+
+                <div style={{ maxHeight: "300px", overflowY: "auto" }}>
                   <table className="table table-hover table-sm">
                     <thead className="table-light">
                       <tr>
@@ -190,24 +192,16 @@ export default function CashierTransactions() {
                         <th>Qty</th>
                         <th>Price</th>
                         <th>Line Total</th>
-                        <th>Void</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(selectedTx.items ?? []).map(it => (
-                        <tr key={it.id} className={it.voided ? "table-danger" : ""}>
-                          <td>{it.item_name ?? "-"}</td>
-                          <td>{it.quantity ?? 0}</td>
-                          <td>₱{Number(it.price ?? 0).toFixed(2)}</td>
-                          <td>₱{(Number(it.price ?? 0) * Number(it.quantity ?? 0)).toFixed(2)}</td>
+                      {selectedTx.items.map(it => (
+                        <tr key={it.id}>
+                          <td>{it.item_name}</td>
+                          <td>{it.quantity}</td>
+                          <td>₱{Number(it.price).toFixed(2)}</td>
                           <td>
-                            {it.voided ? (
-                              <span className="badge bg-danger">Voided</span>
-                            ) : (
-                              <button className="btn btn-sm btn-danger" onClick={() => handleVoid(it)} disabled={voiding}>
-                                Void
-                              </button>
-                            )}
+                            ₱{(Number(it.price) * Number(it.quantity)).toFixed(2)}
                           </td>
                         </tr>
                       ))}
@@ -216,49 +210,12 @@ export default function CashierTransactions() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Void Confirmation Modal */}
-      {voidModalOpen && pendingItem && (
-        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content shadow-lg border-0 rounded-4">
-              <div className="modal-header bg-warning text-dark rounded-top-4">
-                <h5 className="modal-title">Confirm Void</h5>
-              </div>
-              <div className="modal-body">
-                <p>Are you sure you want to void <b>{pendingItem.item_name}</b> (qty {pendingItem.quantity})?<br/>
-                This will refund <b>₱{(Number(pendingItem.price ?? 0) * Number(pendingItem.quantity ?? 0)).toFixed(2)}</b>.</p>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => { setVoidModalOpen(false); setPendingItem(null); }}>Close</button>
-                <button className="btn btn-danger" onClick={confirmVoid} disabled={voiding}>
-                  {voiding ? "Voiding..." : "Void"}
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setModalOpen(false)}
+                >
+                  Close
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Result Modal */}
-      {resultModalOpen && (
-        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content shadow-lg border-0 rounded-4">
-              <div className="modal-header bg-success text-white rounded-top-4">
-                <h5 className="modal-title">Void Result</h5>
-              </div>
-              <div className="modal-body">
-                <p>{resultMessage}</p>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-primary" onClick={() => setResultModalOpen(false)}>Close</button>
               </div>
             </div>
           </div>

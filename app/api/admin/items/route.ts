@@ -81,7 +81,7 @@ export async function DELETE(req: NextRequest) {
   const conn = await pool.getConnection();
   try {
     const [rows]: any = await conn.query(
-      'SELECT COUNT(*) AS count FROM transaction_items WHERE item_id = ?',
+      'SELECT COUNT(*) AS count FROM transactions WHERE item_id = ?',
       [id]
     );
 

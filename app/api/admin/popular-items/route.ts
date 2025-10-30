@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     // Get top 10 most sold items, ignoring voided items
     const [rows]: any = await pool.query(`
       SELECT item_id, item_name, SUM(quantity) AS sold
-      FROM transaction_items
+      FROM transactions
       WHERE voided = 0
       GROUP BY item_id, item_name
       ORDER BY sold DESC
