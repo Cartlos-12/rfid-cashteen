@@ -25,7 +25,7 @@ fetch("/api/admin/user-logs", {
 
 export default function CashierPOS() {
   const router = useRouter();
-
+  
   // ✅ Replace with actual logged-in user info
   const currentUser = { 
     id: "1", 
@@ -35,6 +35,7 @@ export default function CashierPOS() {
 
   const [items, setItems] = useState([]);
   const [cart, setCart] = useState([]);
+  const [paymentItems, setPaymentItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(true);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -184,7 +185,6 @@ const fetchItemsFromAPI = async () => {
   };
 }, [showRFIDModal]);
 
-// --- FIXED fetchCustomer function ---
 const fetchCustomer = async (rfid: string) => {
   try {
     setScanningRFID(true);
@@ -204,6 +204,9 @@ const fetchCustomer = async (rfid: string) => {
       name: customerData.name,
       balance,
     });
+    
+    // Set payment items from cart
+    setPaymentItems([...cart]);
 
     setScanningRFID(false);
     setShowRFIDModal(false); // ✅ close RFID modal
@@ -228,12 +231,12 @@ const fetchCustomer = async (rfid: string) => {
 };
 
   const confirmPayment = async () => {
-    if (!customer || cart.length === 0) return;
+    if (!customer || paymentItems.length === 0) return;
 
     logSystemAccess(currentUser, "Confirm Payment", `Processing payment of ₱${getTotal().toFixed(2)} for ${customer.name}`);
     setLoadingPayment(true);
 
-    const checkoutPayload = { customerId: customer.id, cart };
+    const checkoutPayload = { customerId: customer.id, cart: paymentItems };
 
     try {
       const res = await fetch("/api/checkout", {
@@ -680,28 +683,64 @@ const handleDeleteItem = async () => {
 </div>
 
       {/* Payment Modal */}
-      {customer && (
-        <div className={`modal fade ${showPaymentModal ? "show d-block" : ""}`} tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Confirm Payment</h5>
-              </div>
-              <div className="modal-body">
-                <p><strong>ID:</strong> {customer.id}</p>
-                <p><strong>Name:</strong> {customer.name}</p>
-                <p><strong>Balance:</strong> ₱{customer.balance.toFixed(2)}</p>
-                <hr />
-                <p><strong>Total Purchase:</strong> ₱{getTotal().toFixed(2)}</p>
-              </div>
-              <div className="modal-footer d-flex justify-content-between">
-                <button className="btn btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
-                <button className="btn btn-success" onClick={() => { confirmPayment(); setShowPaymentModal(false); }}>Confirm</button>
-              </div>
-            </div>
-          </div>
+{customer && (
+  <div
+    className={`modal fade ${showPaymentModal ? "show d-block" : ""}`}
+    tabIndex={-1}
+    style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+  >
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h5 className="modal-title">Confirm Payment</h5>
         </div>
-      )}
+        <div className="modal-body">
+          <p><strong>ID:</strong> {customer.id}</p>
+          <p><strong>Name:</strong> {customer.name}</p>
+          <p><strong>Balance: ₱{customer.balance.toFixed(2)}</strong> </p>
+          <hr />
+
+          <table className="table table-sm">
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th>Qty</th>
+      <th>Price</th>
+    </tr>
+  </thead>
+ <tbody>
+              {cart.map((item, index) => (
+                <tr key={index}>
+                  <td>{item.name}</td>
+                  <td>{item.quantity}</td>
+                  <td>₱{(item.price * item.quantity).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+</table>
+
+          
+          <br />
+          <hr />
+          <p style={{marginLeft: '290px'}}><strong>Total Purchase:</strong> ₱{paymentItems.reduce((acc, item) => acc + item.price * item.quantity, 0).toFixed(2)}</p>
+        </div>
+        <div className="modal-footer d-flex justify-content-between">
+          <button className="btn btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
+          <button
+            className="btn btn-success"
+            onClick={() => {
+              confirmPayment(); // Use paymentItems from state
+              setShowPaymentModal(false);
+            }}
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* Low Balance Modal */}
       {showLowBalanceModal && (

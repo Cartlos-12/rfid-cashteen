@@ -102,7 +102,6 @@ export default function CashierTransactions() {
             <table className="table table-striped table-hover align-middle mb-0">
               <thead className="table-primary">
                 <tr>
-                  <th>ID</th>
                   <th>Student</th>
                   <th>Items</th>
                   <th>Total Amount</th>
@@ -114,7 +113,6 @@ export default function CashierTransactions() {
               <tbody>
                 {transactions.map(tx => (
                   <tr key={tx.id}>
-                    <td className="fw-bold">#{tx.id}</td>
                     <td>{tx.user_name ?? "-"}</td>
                     <td>{tx.items?.length ?? 0} item{(tx.items?.length ?? 0) !== 1 ? "s" : ""}</td>
                     <td>₱{Number(tx.total ?? 0).toFixed(2)}</td>

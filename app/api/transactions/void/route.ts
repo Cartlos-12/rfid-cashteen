@@ -1,103 +1,128 @@
-// app/api/transactions/void/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import pool from "../../../lib/db";
+import { NextResponse } from "next/server";
+import mysql from "mysql2/promise";
 
-export async function POST(req: NextRequest) {
-  const conn = await pool.getConnection();
+async function getConnection() {
+  return await mysql.createConnection({
+    host: process.env.DB_HOST || "localhost",
+    user: process.env.DB_USER || "root",
+    password: process.env.DB_PASS || "",
+    database: process.env.DB_NAME || "cashteen_db",
+  });
+}
+
+export async function POST(req: Request) {
+  const body = await req.json();
+  const { transaction_id, item_id, quantity, amount, reason, user_id } = body;
+
+  if (!transaction_id || !item_id || !quantity || !amount || !user_id) {
+    return NextResponse.json(
+      { success: false, message: "Missing required fields" },
+      { status: 400 }
+    );
+  }
+
+  const conn = await getConnection();
   try {
-    // Parse request body and log it
-    const body = await req.json();
-    console.log("Void request body:", body);
-
-    const { transactionId, itemId, quantity, reason } = body;
-
-    // Stricter validation: only block if null/undefined
-    if (transactionId == null || itemId == null) {
-      return NextResponse.json(
-        { success: false, error: "transactionId and itemId required" },
-        { status: 400 }
-      );
-    }
-
-    // Fetch transaction
-    const [txRows]: any = await conn.query(
-      "SELECT id, user_id, total FROM transactions WHERE id = ?",
-      [transactionId]
-    );
-    if (!txRows.length)
-      return NextResponse.json(
-        { success: false, error: "Transaction not found" },
-        { status: 404 }
-      );
-    const tx = txRows[0];
-
-    // Fetch transaction item
-    const [itemRows]: any = await conn.query(
-      "SELECT id, transaction_id, item_name, quantity, price, voided FROM transaction_items WHERE id = ? AND transaction_id = ?",
-      [itemId, transactionId]
-    );
-    if (!itemRows.length)
-      return NextResponse.json(
-        { success: false, error: "Transaction item not found" },
-        { status: 404 }
-      );
-    const item = itemRows[0];
-    if (Number(item.voided))
-      return NextResponse.json(
-        { success: false, error: "Item already voided" },
-        { status: 400 }
-      );
-
-    // Decide quantity
-    const voidQty =
-      typeof quantity === "number" ? Number(quantity) : Number(item.quantity);
-
-    if (voidQty <= 0 || voidQty > Number(item.quantity)) {
-      return NextResponse.json(
-        { success: false, error: "Invalid void quantity" },
-        { status: 400 }
-      );
-    }
-
-    const refundAmount = Number(item.price) * voidQty;
-
     await conn.beginTransaction();
 
-    // Update item
-    if (voidQty === Number(item.quantity)) {
-      await conn.query("UPDATE transaction_items SET voided = 1 WHERE id = ?", [itemId]);
+    // Step 1: Lock the correct transaction row
+    // Step 1: Lock the correct transaction row
+const [itemRows] = await conn.query(
+  `SELECT id, item_id, item_name, quantity, price, status
+   FROM transactions
+   WHERE id = ? AND item_id = ? FOR UPDATE`,
+  [transaction_id, item_id]
+);
+
+
+    const item = (itemRows as any)[0];
+    if (!item) throw new Error("Transaction item not found");
+    if (item.status === "void") throw new Error("Item already voided");
+    if (quantity > item.quantity || quantity < 1) throw new Error("Invalid quantity to void");
+
+    const item_name = item.item_name || "Unknown Item";
+
+    // Step 2: Lock user row (the student)
+    const [userRows] = await conn.query(
+      `SELECT balance FROM users WHERE id = ? FOR UPDATE`,
+      [user_id]
+    );
+    if ((userRows as any).length === 0) throw new Error("User not found");
+
+    // Step 3: Handle voiding
+    const voidedQuantity = quantity;
+    const voidedAmount = amount;
+
+    if (quantity === item.quantity) {
+      // Void the entire item
+      await conn.execute(
+        `UPDATE transactions SET status = 'void' WHERE id = ?`,
+        [transaction_id]
+      );
     } else {
-      const newQty = Number(item.quantity) - voidQty;
-      await conn.query("UPDATE transaction_items SET quantity = ? WHERE id = ?", [newQty, itemId]);
+      // Partial void: reduce quantity
+      await conn.execute(
+        `UPDATE transactions SET quantity = quantity - ? WHERE id = ?`,
+        [quantity, transaction_id]
+      );
     }
 
-    // Update totals & refund
-    await conn.query("UPDATE transactions SET total = total - ? WHERE id = ?", [refundAmount, transactionId]);
-    await conn.query("UPDATE users SET balance = balance + ? WHERE id = ?", [refundAmount, tx.user_id]);
+    // Step 4: Refund the user (student)
+    await conn.execute(
+      `UPDATE users SET balance = balance + ? WHERE id = ?`,
+      [voidedAmount, user_id]
+    );
 
-    // Log void
-    await conn.query(
-      "INSERT INTO transaction_voids (transaction_id, transaction_item_id, amount, reason) VALUES (?, ?, ?, ?)",
-      [transactionId, itemId, refundAmount, reason || null]
+    // Step 5: Recalculate transaction total (sum of non-voided items in this transaction)
+    const [totalRows] = await conn.query(
+      `SELECT SUM(quantity * price) AS new_total
+       FROM transactions
+       WHERE id = ? AND status != 'void'`,
+      [transaction_id]
+    );
+    const newTransactionTotal = (totalRows as any)[0]?.new_total || 0;
+
+    // Update transaction total
+    await conn.execute(
+      `UPDATE transactions SET total = ? WHERE id = ?`,
+      [newTransactionTotal, transaction_id]
+    );
+
+    // Step 6: Insert into transaction_voids (audit table)
+    await conn.execute(
+      `INSERT INTO transaction_voids 
+         (transaction_id, transaction_item_id, amount, reason, voided_by, created_at)
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [transaction_id, item_id, voidedAmount, reason || null, user_id]
+    );
+
+    // Step 7: Log the void action
+    await conn.execute(
+      `INSERT INTO user_logs (user_id, user_name, role, action, details, created_at)
+       VALUES (?, 'cashier', 'cashier', 'VOID_ITEM', ?, NOW())`,
+      [
+        user_id,
+        `Voided ${voidedQuantity}x ${item_name}, refunded ₱${Number(voidedAmount).toFixed(
+          2
+        )}. Reason: ${reason || "N/A"}`,
+      ]
     );
 
     await conn.commit();
+    await conn.end();
 
     return NextResponse.json({
       success: true,
-      refund: refundAmount,
-      message: "Item voided and refunded.",
+      message: "Item voided successfully and user refunded.",
+      new_transaction_total: newTransactionTotal,
     });
   } catch (err: any) {
-    try {
-      await conn.rollback();
-    } catch {}
+    await conn.rollback();
+    await conn.end();
     console.error("Void error:", err);
     return NextResponse.json(
-      { success: false, error: err.message || "Void failed" },
+      { success: false, message: "Server error", error: err.message },
       { status: 500 }
     );
-  } finally {
-    conn.release();
   }
 }

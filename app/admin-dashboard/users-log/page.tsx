@@ -21,79 +21,80 @@ export default function UsersLogPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
 
- const actionMap: Record<string, string[]> = {
-  all: [], // show all
-  login: ['login'],
-  'add to cart': ['add to cart'],
-  'add item': ['add item'],
-  delete: ['delete item'],
-  update: ['update item'],
-  'payment confirmed': ['payment confirmed']
-};
+  // ✅ Added VOID_ITEM to category map
+  const actionMap: Record<string, string[]> = {
+    all: [],
+    login: ['login'],
+    'add to cart': ['add to cart'],
+    'add item': ['add item'],
+    delete: ['delete item'],
+    update: ['update item'],
+    'payment confirmed': ['payment confirmed'],
+    void: ['void_item'], // ✅ new category for void actions
+  };
 
-// Define categories for dropdown (excluding 'all' since it's added manually)
-const categories = Object.keys(actionMap).filter(cat => cat !== 'all');
-
+  // Define dropdown categories
+  const categories = Object.keys(actionMap).filter((cat) => cat !== 'all');
 
   const fetchLogs = async () => {
-  setLoading(true);
-  try {
-    const dateStr = selectedDate || new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-
-    const res = await fetch(
-      `${window.location.origin}/api/admin/user-logs?date=${dateStr}`
-    );
-    if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-    const data = await res.json();
-    setLogs(data.logs || []);
-  } catch (err) {
-    console.error('Failed to fetch user logs:', err);
-    setLogs([]);
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const dateStr = selectedDate || new Date().toISOString().slice(0, 10);
+      const res = await fetch(`${window.location.origin}/api/admin/user-logs?date=${dateStr}`);
+      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+      const data = await res.json();
+      setLogs(data.logs || []);
+    } catch (err) {
+      console.error('Failed to fetch user logs:', err);
+      setLogs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchLogs();
   }, [selectedDate]);
 
   const getBadgeClass = (action: string) => {
-  switch (action.toLowerCase()) {
-    case 'login':
-      return 'bg-success text-white';
-    case 'add to cart':
-    case 'add item':
-      return 'bg-primary text-white';
-    case 'delete item':
-      return 'bg-danger text-white';
-    case 'update item':
-      return 'bg-warning text-white';
-    case 'payment confirmed':
-      return 'bg-info text-white';
-    default:
-      return 'bg-secondary text-white';
-  }
-};
+    switch (action.toLowerCase()) {
+      case 'login':
+        return 'bg-success text-white';
+      case 'add to cart':
+      case 'add item':
+        return 'bg-primary text-white';
+      case 'delete item':
+        return 'bg-danger text-white';
+      case 'update item':
+        return 'bg-warning text-dark';
+      case 'payment confirmed':
+        return 'bg-info text-white';
+      case 'void_item': // ✅ void color
+        return 'bg-danger text-white';
+      default:
+        return 'bg-secondary text-white';
+    }
+  };
 
-
+  // ✅ Include "void_item" in filtered logs
   const filteredLogs = useMemo(() => {
-  return logs
-    .filter(log => {
-      if (activeCategory === 'all') return true;
-      const actions = actionMap[activeCategory];
-      return actions.some(a => log.action.toLowerCase() === a.toLowerCase());
-    })
-    .filter(
-      log =>
-        log.user_name.toLowerCase().includes(search.toLowerCase()) ||
-        log.role.toLowerCase().includes(search.toLowerCase()) ||
-        log.action.toLowerCase().includes(search.toLowerCase()) ||
-        (log.details?.toLowerCase().includes(search.toLowerCase()) ?? false)
-    )
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-}, [logs, activeCategory, search]);
-
+    return logs
+      .filter((log) => {
+        if (activeCategory === 'all') return true;
+        const actions = actionMap[activeCategory];
+        return actions.some((a) => log.action.toLowerCase() === a.toLowerCase());
+      })
+      .filter(
+        (log) =>
+          log.user_name.toLowerCase().includes(search.toLowerCase()) ||
+          log.role.toLowerCase().includes(search.toLowerCase()) ||
+          log.action.toLowerCase().includes(search.toLowerCase()) ||
+          (log.details?.toLowerCase().includes(search.toLowerCase()) ?? false)
+      )
+      .sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+  }, [logs, activeCategory, search]);
 
   return (
     <div className="container-fluid py-2 vh-100 d-flex flex-column" style={{ overflowY: 'auto' }}>
@@ -107,7 +108,7 @@ const categories = Object.keys(actionMap).filter(cat => cat !== 'all');
           className="form-control flex-grow-1"
           placeholder="Search by action, user, role, or details..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
           style={{ minWidth: '200px', maxWidth: '350px' }}
         />
 
@@ -117,7 +118,7 @@ const categories = Object.keys(actionMap).filter(cat => cat !== 'all');
             <button
               className="btn btn-primary dropdown-toggle"
               type="button"
-              onClick={() => setDropdownOpen(prev => !prev)}
+              onClick={() => setDropdownOpen((prev) => !prev)}
               style={{ width: '250px', textAlign: 'center' }}
             >
               Category: {activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)}
@@ -126,10 +127,12 @@ const categories = Object.keys(actionMap).filter(cat => cat !== 'all');
               className={`dropdown-menu${dropdownOpen ? ' show' : ''}`}
               style={{ width: '250px', maxHeight: '250px', overflowY: 'auto' }}
             >
-              {['all', ...categories].map(cat => (
+              {['all', ...categories].map((cat) => (
                 <li key={cat}>
                   <button
-                    className={`dropdown-item text-capitalize ${activeCategory === cat ? 'selected-category' : ''}`}
+                    className={`dropdown-item text-capitalize ${
+                      activeCategory === cat ? 'selected-category' : ''
+                    }`}
                     onClick={() => {
                       setActiveCategory(cat);
                       setDropdownOpen(false);
@@ -156,7 +159,7 @@ const categories = Object.keys(actionMap).filter(cat => cat !== 'all');
               id="datePicker"
               type="date"
               value={selectedDate}
-              onChange={e => setSelectedDate(e.target.value)}
+              onChange={(e) => setSelectedDate(e.target.value)}
               style={{
                 position: 'absolute',
                 top: 0,
@@ -191,12 +194,14 @@ const categories = Object.keys(actionMap).filter(cat => cat !== 'all');
               </tr>
             </thead>
             <tbody>
-              {filteredLogs.map(log => (
+              {filteredLogs.map((log) => (
                 <tr key={log.id}>
                   <td>{log.user_name || '-'}</td>
                   <td>{log.role || '-'}</td>
                   <td>
-                    <span className={`badge ${getBadgeClass(log.action)}`}>{log.action || '-'}</span>
+                    <span className={`badge ${getBadgeClass(log.action)}`}>
+                      {log.action.replace('_', ' ').toUpperCase()}
+                    </span>
                   </td>
                   <td>{log.details || '-'}</td>
                   <td>{new Date(log.created_at).toLocaleString()}</td>
