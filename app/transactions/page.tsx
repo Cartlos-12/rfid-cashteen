@@ -63,7 +63,7 @@ export default function CashierTransactions() {
   }
 
   function openVoidModal(item: TransactionItem) {
-    if (item.status === "void") return; // permanently block
+    if (item.status === "void") return; // already permanently blocked
     setSelectedItem(item);
     setVoidReason("");
     setVoidModal(true);
@@ -107,24 +107,16 @@ export default function CashierTransactions() {
       const data = await res.json();
       if (!data.success) throw new Error(data.message || "Failed to void item");
 
-      // Permanently mark item as void
-      const updatedItems = selectedTx.items.map(it =>
-        it.id === selectedItem.id ? { ...it, status: "void" } : it
-      );
-
-      setSelectedTx({ ...selectedTx, items: updatedItems, total: data.new_transaction_total });
-      setTransactions(prev =>
-        prev.map(tx =>
-          tx.id === selectedTx.id ? { ...tx, items: updatedItems, total: data.new_transaction_total } : tx
-        )
-      );
-
-      // Refresh to reflect permanent block
+      // Refetch the latest transactions from backend to ensure permanent void persists
       await fetchTransactions();
 
       setVoidModal(false);
       setRefundModal(true);
       setSelectedItem(null);
+
+      // Close transaction modal to instantly reflect changes
+      setModalOpen(false);
+
     } catch (err: any) {
       console.error("Error voiding item:", err);
       alert(err.message || "Failed to void item. Please try again.");
@@ -135,10 +127,8 @@ export default function CashierTransactions() {
 
   return (
     <div className="p-4">
-      <header className="py-3 px-3 border-bottom bg-light shadow-sm mb-3 d-flex justify-content-between align-items-center">
-        <h1 className="fw-bold text-dark mb-0">Transactions</h1>
-      </header>
-
+      <h1 className="fw-bold text-dark mb-4">Transactions</h1>
+      
       <div className="card shadow-sm mb-3">
         <div className="card-body p-3" style={{ height: "540px", overflowY: "auto" }}>
           {loading ? (
@@ -159,7 +149,7 @@ export default function CashierTransactions() {
               </thead>
               <tbody>
                 {transactions.map(tx => (
-                  <tr key={tx.id} className={tx.status === "void" ? "table-danger text-decoration-line-through" : ""}>
+                  <tr key={tx.id}>
                     <td>{tx.user_name ?? "-"}</td>
                     <td>{tx.items?.length ?? 0} item{(tx.items?.length ?? 0) !== 1 ? "s" : ""}</td>
                     <td>₱{Number(tx.total ?? 0).toFixed(2)}</td>
@@ -173,7 +163,6 @@ export default function CashierTransactions() {
                       <button
                         className="btn btn-sm btn-primary"
                         onClick={() => openItems(tx)}
-                        disabled={tx.status === "void"} // permanently block viewing actions
                       >
                         View Items
                       </button>
@@ -223,7 +212,7 @@ export default function CashierTransactions() {
                               <button
                                 className="btn btn-sm btn-danger"
                                 onClick={() => openVoidModal(it)}
-                                disabled={isVoided || voiding}
+                                disabled={isVoided || voiding} // disabled permanently
                               >
                                 {isVoided ? "Voided" : voiding && selectedItem?.id === it.id ? "Voiding..." : "Void"}
                               </button>
@@ -246,38 +235,61 @@ export default function CashierTransactions() {
       )}
 
       {/* Void Confirmation Modal */}
-      {voidModal && selectedItem && (
-        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 rounded-4">
-              <div className="modal-header bg-danger text-white rounded-top-4">
-                <h5 className="modal-title">Confirm Void</h5>
-              </div>
-              <div className="modal-body">
-                <p>Are you sure you want to void <strong>{selectedItem.item_name}</strong>?</p>
-                <p>Amount: ₱{(selectedItem.price * selectedItem.quantity).toFixed(2)}</p>
-                <div className="mt-3">
-                  <label className="form-label">Reason (optional)</label>
-                  <textarea
-                    className="form-control"
-                    rows={3}
-                    value={voidReason}
-                    onChange={(e) => setVoidReason(e.target.value)}
-                  ></textarea>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setVoidModal(false)}>
-                  Cancel
-                </button>
-                <button className="btn btn-danger" onClick={handleVoid} disabled={voiding}>
-                  {voiding ? "Voiding..." : "Confirm Void"}
-                </button>
-              </div>
-            </div>
+{voidModal && selectedItem && (
+  <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content border-0 rounded-4">
+        <div className="modal-header bg-danger text-white rounded-top-4">
+          <h5 className="modal-title">Confirm Void</h5>
+        </div>
+        <div className="modal-body">
+          <p>Are you sure you want to void <strong>{selectedItem.item_name}</strong>?</p>
+
+          {/* Quantity input for partial void */}
+          <div className="mb-3">
+            <label className="form-label">Quantity to Void</label>
+            <input
+              type="number"
+              className="form-control"
+              min={1}
+              max={selectedItem.quantity}
+              value={selectedItem.quantity}
+              onChange={(e) =>
+                setSelectedItem({
+                  ...selectedItem,
+                  quantity: Math.min(Math.max(1, Number(e.target.value)), selectedItem.quantity),
+                })
+              }
+            />
+            <small className="text-muted">Max: {selectedItem.quantity}</small>
+          </div>
+
+          {/* Live amount update */}
+          <p>Amount: ₱{(selectedItem.price * selectedItem.quantity).toFixed(2)}</p>
+
+          <div className="mt-3">
+            <label className="form-label">Reason (optional)</label>
+            <textarea
+              className="form-control"
+              rows={3}
+              value={voidReason}
+              onChange={(e) => setVoidReason(e.target.value)}
+            ></textarea>
           </div>
         </div>
-      )}
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={() => setVoidModal(false)}>
+            Cancel
+          </button>
+          <button className="btn btn-danger" onClick={handleVoid} disabled={voiding}>
+            {voiding ? "Voiding..." : "Confirm Void"}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* Refund Confirmation Modal */}
       {refundModal && (

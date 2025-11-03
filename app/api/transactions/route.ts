@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from "next/server"; 
 import mysql from "mysql2/promise";
 
 export async function GET() {
@@ -7,11 +7,11 @@ export async function GET() {
       host: "localhost",
       user: "root",
       password: "",
-      database: "cashteen_db", // change to your DB name
+      database: "cashteen_db",
     });
 
-    // ✅ Fetch all transactions (each row = 1 item in a transaction)
-    const [transactions]: any = await conn.query(
+    // Fetch all transaction items
+    const [rows]: any = await conn.query(
       `SELECT 
          id,
          user_id,
@@ -29,9 +29,9 @@ export async function GET() {
 
     await conn.end();
 
-    // ✅ Group items by transaction id
+    // Group items by transaction id
     const grouped = Object.values(
-      transactions.reduce((acc: any, tx: any) => {
+      rows.reduce((acc: any, tx: any) => {
         if (!acc[tx.id]) {
           acc[tx.id] = {
             id: tx.id,
@@ -39,7 +39,7 @@ export async function GET() {
             user_name: tx.user_name,
             total: tx.total,
             created_at: tx.created_at,
-            status: tx.status,
+            status: tx.status, // transaction status
             items: [],
           };
         }
@@ -48,6 +48,7 @@ export async function GET() {
           item_name: tx.item_name,
           quantity: tx.quantity,
           price: tx.price,
+          status: tx.status, // ✅ include item status
         });
         return acc;
       }, {})

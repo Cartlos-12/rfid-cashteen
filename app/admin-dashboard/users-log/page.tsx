@@ -29,7 +29,7 @@ export default function UsersLogPage() {
     'add item': ['add item'],
     delete: ['delete item'],
     update: ['update item'],
-    'payment confirmed': ['payment confirmed'],
+    'confirm payment': ['confirm payment'],
     void: ['void_item'], // ✅ new category for void actions
   };
 
@@ -67,7 +67,7 @@ export default function UsersLogPage() {
         return 'bg-danger text-white';
       case 'update item':
         return 'bg-warning text-dark';
-      case 'payment confirmed':
+      case 'confirm payment':
         return 'bg-info text-white';
       case 'void_item': // ✅ void color
         return 'bg-danger text-white';

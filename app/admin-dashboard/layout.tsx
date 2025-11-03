@@ -1,27 +1,55 @@
 'use client';
+
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
+interface LayoutProps {
+  children: React.ReactNode;
+}
 
-export default function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
+export default function AdminDashboardLayout({ children }: LayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
 
   const [reportsOpen, setReportsOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
-  // Check session on mount
+  // ------------------------
+  // SESSION PROTECTION
+  // ------------------------
   useEffect(() => {
-    const sessionActive = localStorage.getItem("sessionActive");
-    if (!sessionActive) {
-      router.replace("/"); // redirect to login if no session
-    }
+    const checkSession = () => {
+      const sessionActive = localStorage.getItem("sessionActive");
+      if (!sessionActive) {
+        router.replace("/"); // redirect to login
+      } else {
+        setSessionChecked(true);
+      }
+    };
+
+    checkSession();
+
+    // Listen to back/forward navigation
+    const handlePopState = () => {
+      const sessionActive = localStorage.getItem("sessionActive");
+      if (!sessionActive) {
+        router.replace("/"); // redirect immediately
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [router]);
 
+  // ------------------------
+  // LOGOUT FUNCTION
+  // ------------------------
   const handleLogout = () => {
-    localStorage.removeItem("sessionActive"); // expire session
-    setShowLogoutModal(false);
-    router.replace("/"); // redirect to login
+    localStorage.removeItem("sessionActive");
+    sessionStorage.clear();
+    // force full reload to clear cached pages & history
+    window.location.href = "/";
   };
 
   const toggleReports = () => setReportsOpen(!reportsOpen);
@@ -35,6 +63,8 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
     { name: "Users", path: "/admin-dashboard/users" },
     { name: "Add Item", path: "/admin-dashboard/add" },
   ];
+
+  if (!sessionChecked) return null; // hide content until session verified
 
   return (
     <div className="d-flex vh-100 text-white">
@@ -50,7 +80,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
               backgroundColor: "rgba(255, 255, 255, 0.15)",
             }}
           >
-            <img src="/logo.png" alt="Logo" style={{ width: "60px", height: "60px", objectFit: "contain", borderRadius:"50px"}} />
+            <img src="/logo.png" alt="Logo" style={{ width: "60px", height: "60px", objectFit: "contain", borderRadius:"50%"}} />
           </div>
           <span className="fs-5 fw-bold text-white text-center">Admin Panel</span>
         </div>
@@ -142,6 +172,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
         </div>
       )}
 
+      {/* Inline Styles */}
       <style jsx>{`
         .sidebar-bg { background: #0099ff; }
         .nav-link {

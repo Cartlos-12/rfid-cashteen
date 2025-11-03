@@ -1,29 +1,21 @@
 // app/parent/api/auth/check/route.ts
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "my_super_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET!;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const token = request.cookies.get("parentToken")?.value;
+
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("parentToken")?.value;
-
-    if (!token) {
-      return NextResponse.json({ success: false, message: "Not authenticated" }, { status: 401 });
-    }
-
-    // ✅ Verify JWT
-    const decoded = jwt.verify(token, JWT_SECRET);
-
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: "Invalid token" }, { status: 401 });
-    }
-
-    return NextResponse.json({ success: true, message: "Authenticated" });
-  } catch (error) {
-    console.error("Auth check error:", error);
-    return NextResponse.json({ success: false, message: "Auth check failed" }, { status: 401 });
+    jwt.verify(token, JWT_SECRET);
+    return NextResponse.json({ valid: true });
+  } catch {
+    // Expired or invalid token
+    return NextResponse.json({ error: "Session expired" }, { status: 401 });
   }
 }

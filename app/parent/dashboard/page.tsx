@@ -51,8 +51,8 @@ export default function DashboardPage() {
       return d;
     });
 
-    const totals: number[] = last7Days.map(day => {
-      return transactions
+    const totals: number[] = last7Days.map(day =>
+      transactions
         .filter(tx => {
           const txDate = new Date(tx.created_at);
           return (
@@ -61,13 +61,11 @@ export default function DashboardPage() {
             txDate.getDate() === day.getDate()
           );
         })
-        .reduce((sum, tx) => sum + Number(tx.total), 0);
-    });
+        .reduce((sum, tx) => sum + Number(tx.total), 0)
+    );
 
     const maxIndex = totals.indexOf(Math.max(...totals));
-    const backgroundColors = totals.map((_, idx) =>
-      idx === maxIndex ? '#198754' : '#0d6efd'
-    );
+    const backgroundColors = totals.map((_, idx) => (idx === maxIndex ? '#198754' : '#0d6efd'));
 
     return {
       labels: last7Days.map(d => `${days[d.getDay()]} (${d.getDate()}/${d.getMonth() + 1})`),
@@ -88,74 +86,95 @@ export default function DashboardPage() {
   if (loading) return <p className="text-center py-5 text-muted">Loading dashboard...</p>;
 
   return (
-    <div className="container py-3">
-      {/* Weekly Expenses */}
-      <div className="mb-3">
-        <h4 className="fw-bold text-primary mb-1">Weekly Expenses</h4>
-        <p className="fs-6 fw-semibold mb-2">
-          Total Spent This Week: <span className="text-success fw-bold">₱{totalThisWeek.toFixed(2)}</span>
-        </p>
-        <div className="card shadow-sm mb-4" style={{ maxWidth: '100%', fontSize: '0.85rem' }}>
-          <div className="card-body p-2" style={{ height: '280px' }}>
-            <Bar
-              data={weeklyData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: { display: false },
-                  title: { display: true, text: 'Expenses in the Last 7 Days', font: { size: 12 } },
-                  tooltip: { enabled: true },
-                },
-                scales: {
-                  y: { beginAtZero: true, ticks: { stepSize: 50 } },
-                  x: { ticks: { font: { size: 10 } } },
-                },
-              }}
-            />
+    <div className="w-100 min-vh-100 py-3 px-3 px-md-4">
+      {/* Dashboard Grid */}
+      <div className="row g-3 mb-4">
+        {/* Total Spent Card */}
+        <div className="col-12 col-md-4">
+          <div className="card shadow-sm h-100 border-0">
+            <div className="card-body d-flex flex-column justify-content-center align-items-center py-4">
+              <h6 className="text-muted mb-2">Total Spent This Week</h6>
+              <h3 className="fw-bold text-success">₱{totalThisWeek.toFixed(2)}</h3>
+            </div>
+          </div>
+        </div>
+
+        {/* Weekly Expenses Chart */}
+        <div className="col-12 col-md-8">
+          <div className="card shadow-sm h-100 border-0">
+            <div className="card-body p-2" style={{ height: '280px' }}>
+              <Bar
+                data={weeklyData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: false },
+                    title: {
+                      display: true,
+                      text: 'Expenses in the Last 7 Days',
+                      font: { size: 12 },
+                    },
+                    tooltip: { enabled: true },
+                  },
+                  scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 50 } },
+                    x: { ticks: { font: { size: 10 } } },
+                  },
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Recent Purchases */}
+      {/* Recent Purchases Table */}
       <h4 className="fw-bold mb-3 text-primary">Recent Purchases</h4>
       {transactions.length === 0 ? (
         <p className="text-muted">No recent transactions.</p>
       ) : (
-        <div className="row g-2">
-          {transactions.map(tx => (
-            <div key={tx.id} className="col-12 col-sm-6 col-md-4">
-              <div className="card shadow-sm h-100 border-0" style={{ fontSize: '0.85rem' }}>
-                <div className="card-body d-flex flex-column justify-content-between p-2">
-                  <div>
-                    <h6 className="card-title mb-1">₱{Number(tx.total).toFixed(2)}</h6>
-                    <p className="card-text mb-1">
-                      <span
-                        className={`badge px-2 py-1 rounded-pill ${
-                          tx.status?.trim().toLowerCase() === 'completed'
-                            ? 'bg-success-subtle text-success'
-                            : tx.status?.trim().toLowerCase() === 'pending'
-                            ? 'bg-warning-subtle text-warning'
-                            : 'bg-danger-subtle text-danger'
-                        }`}
-                      >
-                        {tx.status}
-                      </span>
-                    </p>
-                    <p className="card-text text-muted mb-1">
-                      {new Date(tx.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <button
-                    className="btn btn-sm btn-outline-primary mt-2"
-                    onClick={() => alert(`View items for transaction #${tx.id}`)}
-                  >
-                    View Items
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="table-responsive">
+          <table className="table table-striped table-hover align-middle">
+            <thead className="table-light">
+              <tr>
+                <th>User</th>
+                <th>Total (₱)</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map(tx => (
+                <tr key={tx.id}>
+                  <td>{tx.user_name}</td>
+                  <td>{Number(tx.total).toFixed(2)}</td>
+                  <td>
+                    <span
+                      className={`badge px-2 py-1 rounded-pill ${
+                        tx.status?.trim().toLowerCase() === 'completed'
+                          ? 'bg-success-subtle text-success'
+                          : tx.status?.trim().toLowerCase() === 'pending'
+                          ? 'bg-warning-subtle text-warning'
+                          : 'bg-danger-subtle text-danger'
+                      }`}
+                    >
+                      {tx.status}
+                    </span>
+                  </td>
+                  <td>{new Date(tx.created_at).toLocaleString()}</td>
+                  <td>
+                    <button
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={() => alert(`View items for transaction #${tx.id}`)}
+                    >
+                      View Items
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

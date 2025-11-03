@@ -22,18 +22,17 @@ export async function POST(req: Request) {
   }
 
   const conn = await getConnection();
+
   try {
     await conn.beginTransaction();
 
-    // Step 1: Lock the correct transaction row
-    // Step 1: Lock the correct transaction row
-const [itemRows] = await conn.query(
-  `SELECT id, item_id, item_name, quantity, price, status
-   FROM transactions
-   WHERE id = ? AND item_id = ? FOR UPDATE`,
-  [transaction_id, item_id]
-);
-
+    // Lock the specific item row
+    const [itemRows] = await conn.query(
+      `SELECT id, item_id, item_name, quantity, price, status
+       FROM transactions
+       WHERE id = ? AND item_id = ? FOR UPDATE`,
+      [transaction_id, item_id]
+    );
 
     const item = (itemRows as any)[0];
     if (!item) throw new Error("Transaction item not found");
@@ -42,38 +41,35 @@ const [itemRows] = await conn.query(
 
     const item_name = item.item_name || "Unknown Item";
 
-    // Step 2: Lock user row (the student)
+    // Lock user row
     const [userRows] = await conn.query(
       `SELECT balance FROM users WHERE id = ? FOR UPDATE`,
       [user_id]
     );
     if ((userRows as any).length === 0) throw new Error("User not found");
 
-    // Step 3: Handle voiding
-    const voidedQuantity = quantity;
-    const voidedAmount = amount;
-
+    // Void the item or reduce quantity
     if (quantity === item.quantity) {
-      // Void the entire item
+      // Full item void
       await conn.execute(
-        `UPDATE transactions SET status = 'void' WHERE id = ?`,
-        [transaction_id]
+        `UPDATE transactions SET status = 'void' WHERE id = ? AND item_id = ?`,
+        [transaction_id, item_id]
       );
     } else {
-      // Partial void: reduce quantity
+      // Partial void
       await conn.execute(
-        `UPDATE transactions SET quantity = quantity - ? WHERE id = ?`,
-        [quantity, transaction_id]
+        `UPDATE transactions SET quantity = quantity - ? WHERE id = ? AND item_id = ?`,
+        [quantity, transaction_id, item_id]
       );
     }
 
-    // Step 4: Refund the user (student)
+    // Refund user
     await conn.execute(
       `UPDATE users SET balance = balance + ? WHERE id = ?`,
-      [voidedAmount, user_id]
+      [amount, user_id]
     );
 
-    // Step 5: Recalculate transaction total (sum of non-voided items in this transaction)
+    // Recalculate transaction total (sum of non-voided items)
     const [totalRows] = await conn.query(
       `SELECT SUM(quantity * price) AS new_total
        FROM transactions
@@ -82,29 +78,26 @@ const [itemRows] = await conn.query(
     );
     const newTransactionTotal = (totalRows as any)[0]?.new_total || 0;
 
-    // Update transaction total
     await conn.execute(
       `UPDATE transactions SET total = ? WHERE id = ?`,
       [newTransactionTotal, transaction_id]
     );
 
-    // Step 6: Insert into transaction_voids (audit table)
+    // Audit table
     await conn.execute(
       `INSERT INTO transaction_voids 
          (transaction_id, transaction_item_id, amount, reason, voided_by, created_at)
        VALUES (?, ?, ?, ?, ?, NOW())`,
-      [transaction_id, item_id, voidedAmount, reason || null, user_id]
+      [transaction_id, item_id, amount, reason || null, user_id]
     );
 
-    // Step 7: Log the void action
+    // Log
     await conn.execute(
       `INSERT INTO user_logs (user_id, user_name, role, action, details, created_at)
        VALUES (?, 'cashier', 'cashier', 'VOID_ITEM', ?, NOW())`,
       [
         user_id,
-        `Voided ${voidedQuantity}x ${item_name}, refunded ₱${Number(voidedAmount).toFixed(
-          2
-        )}. Reason: ${reason || "N/A"}`,
+        `Voided ${quantity}x ${item_name}, refunded ₱${Number(amount).toFixed(2)}. Reason: ${reason || "N/A"}`
       ]
     );
 
