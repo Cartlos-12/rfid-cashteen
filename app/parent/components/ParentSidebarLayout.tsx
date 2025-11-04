@@ -33,9 +33,7 @@ export default function ParentSidebarLayout({ student, children }: Props) {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [sessionValid, setSessionValid] = useState(false);
 
-  // -------------------------------------
-  // ✅ SESSION VALIDATION & PROTECTION
-  // -------------------------------------
+  // ✅ Session Validation
   useEffect(() => {
     let isMounted = true;
     let intervalId: NodeJS.Timeout;
@@ -44,7 +42,6 @@ export default function ParentSidebarLayout({ student, children }: Props) {
       setSessionValid(false);
       localStorage.clear();
       sessionStorage.clear();
-      // Hard redirect to prevent back/forward navigation
       window.location.replace('/parent/login');
     };
 
@@ -52,12 +49,9 @@ export default function ParentSidebarLayout({ student, children }: Props) {
       try {
         const res = await fetch('/parent/api/auth/check', { credentials: 'include' });
         if (!res.ok) throw new Error('Session invalid');
-
         if (isMounted) {
           setSessionValid(true);
           setSessionChecked(true);
-
-          // Redirect from login to dashboard if session valid
           if (window.location.pathname === '/parent/login') {
             window.location.replace('/parent/dashboard');
           }
@@ -68,23 +62,15 @@ export default function ParentSidebarLayout({ student, children }: Props) {
     };
 
     checkSession();
-    // Re-check periodically (30s)
     intervalId = setInterval(checkSession, 30000);
 
-    // Handle back/forward navigation
     const handlePopState = () => checkSession();
-    // Handle tab visibility change
-    const handleVisibilityChange = () => {
-      if (!document.hidden) checkSession();
-    };
+    const handleVisibilityChange = () => !document.hidden && checkSession();
 
     window.addEventListener('popstate', handlePopState);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Prevent cached pages from showing after logout
-    window.onpageshow = (event) => {
-      if (event.persisted) checkSession();
-    };
+    window.onpageshow = (e) => e.persisted && checkSession();
 
     return () => {
       isMounted = false;
@@ -95,16 +81,13 @@ export default function ParentSidebarLayout({ student, children }: Props) {
     };
   }, [pathname, router]);
 
-  // -------------------------------------
-  // ✅ LOGOUT FUNCTION
-  // -------------------------------------
+  // ✅ Logout
   const handleLogout = async () => {
     try {
       await fetch('/parent/api/auth/logout', { method: 'POST', credentials: 'include' });
-    } catch (err) {
-      console.error('Logout failed', err);
+    } catch {
+      /* ignore */
     } finally {
-      // Expire session immediately
       setSessionValid(false);
       localStorage.clear();
       sessionStorage.clear();
@@ -112,47 +95,34 @@ export default function ParentSidebarLayout({ student, children }: Props) {
     }
   };
 
-  // -------------------------------------
-  // NAV LINK CLASS
-  // -------------------------------------
   const navLinkClass = (href: string) =>
-    `nav-link d-flex justify-content-start px-3 py-3 rounded-3 fw-semibold mb-0 ${
+    `nav-link d-flex justify-content-start px-3 py-3 rounded-3 fw-semibold mb-1 ${
       pathname === href
         ? 'bg-white text-primary shadow-sm'
         : 'text-white opacity-85 hover-opacity-100'
     }`;
 
-  // -------------------------------
-  // ❌ BLOCK RENDERING IF SESSION INVALID
-  // -------------------------------
   if (!sessionChecked || !sessionValid) return null;
 
-  // -------------------------------------
-  // RENDER COMPONENT
-  // -------------------------------------
   return (
-    <div className="min-vh-100" style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gridTemplateRows: '1fr' }}>
-      {/* Mobile top bar */}
-      <div className="d-md-none bg-primary text-white d-flex justify-content-between align-items-center px-3 py-3 shadow-sm position-fixed top-0 start-0 w-100 z-index-1051">
-        <button
-          className="btn btn-sm text-white border-0 bg-transparent"
-          onClick={() => setSidebarOpen(true)}
-        >
+    <div className="layout-wrapper d-flex">
+      {/* Mobile Top Bar */}
+      <div className="mobile-topbar d-md-none bg-primary text-white d-flex justify-content-between align-items-center px-3 py-3 position-fixed top-0 start-0 w-100 shadow-sm">
+        <button className="btn text-white border-0 bg-transparent" onClick={() => setSidebarOpen(true)}>
           <List size={24} />
         </button>
         <h5 className="mb-0 fw-bold">Parent Portal</h5>
-        <div style={{ width: '24px' }}></div>
+        <div style={{ width: '24px' }} />
       </div>
 
       {/* Sidebar */}
       <aside
-        className={`sidebar bg-gradient-primary text-white d-flex flex-column justify-content-between vh-100 shadow-lg ${
+        className={`sidebar bg-gradient-primary text-white d-flex flex-column justify-content-between shadow-lg ${
           sidebarOpen ? 'open' : ''
         }`}
-        style={{ width: '280px', position: 'fixed', top: 0, left: 0, zIndex: 1050, transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.3s ease-in-out' }}
       >
-        <div className="d-flex justify-content-between align-items-center p-3 border-bottom border-white-50">
-          <h6 className="mb-0 fw-bold text-white">Parent Portal</h6>
+        <div className="d-flex justify-content-between align-items-center p-3 border-bottom border-white-25">
+          <h6 className="mb-0 fw-bold">Parent Portal</h6>
           <button
             className="btn btn-sm text-white d-md-none border-0 bg-transparent"
             onClick={() => setSidebarOpen(false)}
@@ -161,19 +131,19 @@ export default function ParentSidebarLayout({ student, children }: Props) {
           </button>
         </div>
 
-        <div className="flex-grow-1 overflow-auto p-3">
-          {/* Student Info Card */}
+        <div className="p-3 flex-grow-1 overflow-auto">
+          {/* Student Info */}
           <div className="card text-black mb-4 border-0 rounded-4 shadow-sm bg-white">
             {student ? (
               <div className="p-3">
                 <div className="d-flex align-items-center mb-3">
                   <div
-                    className="rounded-circle bg-primary d-flex align-items-center justify-content-center me-3 flex-shrink-0"
-                    style={{ width: '50px', height: '50px' }}
+                    className="rounded-circle bg-primary d-flex align-items-center justify-content-center me-2"
+                    style={{ width: '51px', height: '44px' }}
                   >
                     <PersonBadge size={24} color="white" />
                   </div>
-                  <div className="flex-grow-1">
+                  <div>
                     <p className="fw-bold mb-1 fs-6 text-truncate">{student.name}</p>
                     <small className="text-muted d-block">ID: {student.id}</small>
                     <small className="text-muted">RFID: {student.rfid}</small>
@@ -187,129 +157,129 @@ export default function ParentSidebarLayout({ student, children }: Props) {
               </div>
             ) : (
               <div className="placeholder-glow p-3">
-                <div className="d-flex align-items-center mb-2">
-                  <div
-                    className="placeholder rounded-circle bg-secondary me-3"
-                    style={{ width: '50px', height: '50px', opacity: 0.5 }}
-                  ></div>
-                  <div className="flex-grow-1">
-                    <span className="placeholder col-8 mb-1 d-block"></span>
-                    <span className="placeholder col-6 mb-1 d-block"></span>
-                    <span className="placeholder col-4 d-block"></span>
-                  </div>
-                </div>
-                <div className="border-top pt-2">
-                  <span className="placeholder col-5 d-block"></span>
-                </div>
+                <div className="placeholder col-12 mb-3" />
+                <div className="placeholder col-8 mb-2" />
+                <div className="placeholder col-6" />
               </div>
             )}
           </div>
 
+          {/* Nav Links */}
           <nav className="nav flex-column">
-            <Link
-              href="/parent/dashboard"
-              className={navLinkClass('/parent/dashboard')}
-              onClick={() => setSidebarOpen(false)}
-            >
-              <Speedometer2 size={20} />
-              <span className="ms-3">Dashboard</span>
+            <Link href="/parent/dashboard" className={navLinkClass('/parent/dashboard')} onClick={() => setSidebarOpen(false)}>
+              <Speedometer2 size={20} /> <span className="ms-3">Dashboard</span>
             </Link>
-            <Link
-              href="/parent/topup"
-              className={navLinkClass('/parent/topup')}
-              onClick={() => setSidebarOpen(false)}
-            >
-              <CashCoin size={20} />
-              <span className="ms-3">Load Money</span>
+            <Link href="/parent/topup" className={navLinkClass('/parent/topup')} onClick={() => setSidebarOpen(false)}>
+              <CashCoin size={20} /> <span className="ms-3">Load Money</span>
             </Link>
-            <Link
-              href="/parent/topup-history"
-              className={navLinkClass('/parent/topup-history')}
-              onClick={() => setSidebarOpen(false)}
-            >
-              <ClockHistory size={20} />
-              <span className="ms-3">Load History</span>
+            <Link href="/parent/topup-history" className={navLinkClass('/parent/topup-history')} onClick={() => setSidebarOpen(false)}>
+              <ClockHistory size={20} /> <span className="ms-3">Load History</span>
             </Link>
-            <Link
-              href="/parent/receipts"
-              className={navLinkClass('/parent/receipts')}
-              onClick={() => setSidebarOpen(false)}
-            >
-              <Receipt size={20} />
-              <span className="ms-3">Receipts</span>
+            <Link href="/parent/receipts" className={navLinkClass('/parent/receipts')} onClick={() => setSidebarOpen(false)}>
+              <Receipt size={20} /> <span className="ms-3">Receipts</span>
             </Link>
           </nav>
         </div>
 
-        {/* Logout Button */}
-        <div className="p-3 border-top border-white-50 mt-auto">
+        <div className="p-3 border-top border-white-25">
           <button
             onClick={handleLogout}
-            className="btn w-100 fw-bold d-flex align-items-center justify-content-center gap-2 border-0"
-            style={{
-              backgroundColor: '#dc3545',
-              color: 'white',
-              borderRadius: '8px',
-              padding: '10px 0',
-              transition: 'background-color 0.2s ease, transform 0.1s ease',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#c82333')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#dc3545')}
+            className="btn w-100 fw-bold d-flex align-items-center justify-content-center gap-2 border-0 text-white"
+            style={{ backgroundColor: '#dc3545', borderRadius: '8px', padding: '10px 0' }}
           >
             <BoxArrowRight size={18} />
-            <span>Logout</span>
+            Logout
           </button>
         </div>
       </aside>
 
-      {/* Overlay for mobile */}
-      <div
-        className={`overlay position-fixed top-0 start-0 w-100 h-100 ${sidebarOpen ? 'show' : ''}`}
-        onClick={() => setSidebarOpen(false)}
-      ></div>
+      {/* Overlay for Mobile */}
+      <div className={`overlay ${sidebarOpen ? 'active' : ''}`} onClick={() => setSidebarOpen(false)} />
 
-      {/* Main Content */}
-      <main className="p-3 p-md-4 bg-light overflow-auto" style={{ gridColumn: '2', gridRow: '1', minHeight: '100vh' }}>
-        {children}
+      <main className="main-content flex-grow-1 bg-light">
+        <div className="content-wrapper">{children}</div>
       </main>
 
       <style jsx>{`
         .bg-gradient-primary {
-          background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+          background: linear-gradient(135deg, #007bff, #0056b3);
         }
+
+        /* Sidebar Styling */
         .sidebar {
-          z-index: 1050;
+          width: 270px;
+          position: fixed;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          transform: translateX(-100%);
+          transition: transform 0.3s ease-in-out;
+          z-index: 1200;
         }
+
         .sidebar.open {
           transform: translateX(0);
         }
+
+        /* Mobile Top Bar */
+        .mobile-topbar {
+          z-index: 1100;
+        }
+
+        /* Overlay for Mobile Sidebar with smooth transition */
         .overlay {
-          background-color: rgba(0, 0, 0, 0.5);
+          position: fixed;
+          inset: 0;
+          background-color: rgba(0, 0, 0, 0);
           opacity: 0;
-          visibility: hidden;
-          z-index: 1040;
-          transition: opacity 0.3s ease;
+          z-index: 1150;
+          transition: opacity 0.3s ease-in-out;
+          pointer-events: none;
         }
-        .overlay.show {
+        .overlay.active {
+          background-color: rgba(0, 0, 0, 0.5);
           opacity: 1;
-          visibility: visible;
+          pointer-events: auto;
         }
+
+        /* Main Content Area */
+        .main-content {
+          min-height: 100vh;
+          width: 100%;
+          overflow-x: hidden;
+          overflow-y: auto;
+          background-color: #f8f9fa;
+          position: relative;
+          z-index: 1;
+        }
+
+        /* Page Content Wrapper */
+        .content-wrapper {
+          max-width: 1200px;
+          margin: 0 auto;
+          width: 100%;
+          padding: 1rem;
+        }
+
+        /* Mobile: push content below top bar */
+        @media (max-width: 767px) {
+          .content-wrapper {
+            padding-top: 80px; /* Space for top bar */
+          }
+        }
+
+        /* Desktop Sidebar layout */
         @media (min-width: 768px) {
           .sidebar {
-            position: static !important;
-            transform: none !important;
+            transform: none;
+            z-index: 1050;
           }
-          .overlay {
-            display: none;
+          .main-content {
+            margin-left: 280px; /* Sidebar width */
           }
-        }
-        .nav-link {
-          transition: all 0.2s ease-in-out;
-          text-decoration: none;
-        }
-        .nav-link:hover {
-          background-color: rgba(255, 255, 255, 0.15);
-          transform: translateX(5px);
+          .content-wrapper {
+            padding-top: 1.5rem;
+          }
         }
       `}</style>
     </div>

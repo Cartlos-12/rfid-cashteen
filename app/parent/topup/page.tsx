@@ -5,15 +5,18 @@ import { useEffect, useState, useRef } from 'react';
 export default function TopUpPage() {
   const [student, setStudent] = useState<{ rfid: string } | null>(null);
   const [amount, setAmount] = useState('');
-  const [wallet, setWallet] = useState('Gcash');
+  const [wallet, setWallet] = useState('gcash');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(300); // 5 minutes
+  const [canResend, setCanResend] = useState(false);
 
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const countdownInterval = useRef<number | null>(null);
 
   // Fetch student RFID
   useEffect(() => {
@@ -31,7 +34,41 @@ export default function TopUpPage() {
     fetchStudent();
   }, []);
 
+  // Handle OTP countdown
+  useEffect(() => {
+    if (showOtpModal && isOtpSent && otpCountdown > 0) {
+      if (countdownInterval.current === null) {
+        countdownInterval.current = window.setInterval(() => {
+          setOtpCountdown(prev => prev - 1);
+        }, 1000);
+      }
+    } else if (otpCountdown <= 0 && countdownInterval.current !== null) {
+      clearInterval(countdownInterval.current);
+      countdownInterval.current = null;
+      setCanResend(true);
+      setOtpError('⏰ OTP expired. Please resend.');
+    }
+
+    return () => {
+      if (countdownInterval.current !== null) {
+        clearInterval(countdownInterval.current);
+        countdownInterval.current = null;
+      }
+    };
+  }, [showOtpModal, isOtpSent, otpCountdown]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
   const handleSendOtp = async () => {
+    if (!student?.rfid || !amount) {
+      setOtpError('⚠️ Please fill in all required fields.');
+      return;
+    }
+
     setIsLoading(true);
     setOtpError('');
     try {
@@ -44,6 +81,8 @@ export default function TopUpPage() {
       if (res.ok && data.success) {
         setIsOtpSent(true);
         setShowOtpModal(true);
+        setOtpCountdown(300); // reset 5 min
+        setCanResend(false);
         setOtpError('OTP sent to your email.');
         setTimeout(() => otpRefs.current[0]?.focus(), 100);
       } else setOtpError(`❌ ${data.message || 'Failed to send OTP.'}`);
@@ -83,14 +122,16 @@ export default function TopUpPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        // Success: reset inputs
         setAmount('');
         setWallet('gcash');
         setOtp(['', '', '', '', '', '']);
         setShowOtpModal(false);
         setShowSuccessModal(true);
+        if (countdownInterval.current !== null) {
+          clearInterval(countdownInterval.current);
+          countdownInterval.current = null;
+        }
       } else {
-        // OTP error or expired
         setOtpError(` ${data.message || 'OTP is invalid or expired.'}`);
       }
     } catch (err) {
@@ -102,24 +143,28 @@ export default function TopUpPage() {
   };
 
   return (
-    <div className="min-vh-100 d-flex justify-content-center align-items-center bg-light p-3">
-      <div className="card shadow-lg w-100" style={{ maxWidth: '450px', borderRadius: '1rem' }}>
+    <div className="topup-page-wrapper">
+      <div
+        className="card shadow-lg animate-drop-in"
+        style={{ maxWidth: '480px', width: '100%', borderRadius: '1rem', marginTop: '1rem' }}
+      >
         <div className="card-body p-4">
-          <h3 className="text-center text-primary mb-3">Load RFID Balance</h3>
+          <h3 className="text-center text-primary fw-bold mb-3">Load RFID Balance</h3>
           <p className="text-center text-muted mb-4">Confirm your details before proceeding.</p>
 
           <div className="mb-3">
-            <label className="form-label">RFID Tag</label>
+            <label className="form-label fw-semibold">RFID Tag</label>
             <input
               type="text"
-              className="form-control"
+              className="form-control text-center fw-bold"
               value={student?.rfid ?? 'Loading...'}
               disabled
+              style={{ fontSize: '1.1rem' }}
             />
           </div>
 
           <div className="mb-3">
-            <label className="form-label">Amount (₱)</label>
+            <label className="form-label fw-semibold">Amount (₱)</label>
             <input
               type="number"
               className="form-control"
@@ -128,11 +173,13 @@ export default function TopUpPage() {
               onChange={(e) => setAmount(e.target.value)}
               min={50}
               step={50}
+              style={{ fontWeight: '500' }}
             />
+            {!amount && <p className="text-danger justify-content-start text-mute mt-1">Please enter an amount.</p>}
           </div>
 
           <div className="mb-4">
-            <label className="form-label">E-Wallet</label>
+            <label className="form-label fw-semibold">E-Wallet</label>
             <select
               className="form-select"
               value={wallet}
@@ -142,24 +189,29 @@ export default function TopUpPage() {
             </select>
           </div>
 
+          {otpError && <p className="text-center text-danger mb-3">{otpError}</p>}
+
           <button
-            className="btn btn-primary w-100 mb-3"
+            className="btn btn-primary w-100 py-2 fw-bold"
             onClick={handleSendOtp}
-            disabled={isLoading}
+            disabled={isLoading || !student?.rfid || !amount}
           >
-            {isLoading ? 'Processing…' : 'Confirm'}
+            {isLoading && <span className="spinner-border spinner-border-sm text-light me-2"></span>}
+            Confirm
           </button>
         </div>
       </div>
 
       {/* OTP Modal */}
       {showOtpModal && (
-        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
-             style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(5px)', zIndex: 1050 }}>
-          <div className="card p-4 shadow-lg" style={{ maxWidth: '400px', borderRadius: '1rem' }}>
-            <h5 className="text-center mb-3">Enter OTP</h5>
-            <p className="text-center text-muted mb-3">6-digit OTP sent to your email</p>
-            {otpError && <p className="text-center text-danger mb-2">{otpError}</p>}
+        <div className="modal-overlay">
+          <div className="modal-card animate-drop-in">
+            <h5 className="text-center mb-2 fw-bold">Enter OTP</h5>
+            <p className="text-center text-muted mb-2">6-digit OTP sent to your email</p>
+            <p className="text-center text-secondary mb-3">
+              {otpCountdown > 0 ? `OTP expires in ${formatTime(otpCountdown)}` : 'OTP expired'}
+            </p>
+            {otpError && <p className="text-center text-danger mb-3">{otpError}</p>}
 
             <div className="d-flex justify-content-center gap-2 mb-3 flex-wrap">
               {otp.map((digit, idx) => (
@@ -170,22 +222,33 @@ export default function TopUpPage() {
                   value={digit}
                   onChange={(e) => handleOtpChange(idx, e.target.value)}
                   maxLength={1}
-                  className="form-control text-center"
-                  style={{ width: '3rem', height: '3rem', fontSize: '1.25rem' }}
+                  className="form-control text-center fw-bold otp-input"
                 />
               ))}
             </div>
 
             <button
-              className="btn btn-success w-100 mb-2 d-flex justify-content-center align-items-center gap-2"
+              className="btn btn-primary w-100 mb-2 py-2 fw-bold d-flex justify-content-center align-items-center gap-2"
               onClick={handleTopup}
-              disabled={isLoading}
+              disabled={isLoading || otpCountdown <= 0}
             >
-              {isLoading && <span className="spinner-border spinner-border-sm text-dark"></span>}
+              {isLoading && <span className="spinner-border spinner-border-sm text-light"></span>}
               Proceed
             </button>
-            <button className="btn btn-outline-secondary w-100" onClick={() => setShowOtpModal(false)}>
+
+            <button
+              className="btn btn-outline-secondary w-100 mb-2 py-2"
+              onClick={() => setShowOtpModal(false)}
+            >
               Cancel
+            </button>
+
+            <button
+              className="btn btn-link w-100 py-1"
+              onClick={handleSendOtp}
+              disabled={!canResend}
+            >
+              Resend OTP
             </button>
           </div>
         </div>
@@ -193,19 +256,88 @@ export default function TopUpPage() {
 
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
-             style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(5px)', zIndex: 1050 }}>
-          <div className="card p-4 shadow-lg border-success" style={{ maxWidth: '400px', borderRadius: '1rem' }}>
+        <div className="modal-overlay">
+          <div className="modal-card border-success animate-drop-in">
             <div className="text-center mb-3">
-              <h5 className="text-success">Money Sent Successful</h5>
+              <h5 className="text-success fw-bold">Money Sent Successfully</h5>
               <p className="text-muted">Your RFID balance has been updated.</p>
             </div>
-            <button className="btn btn-success w-100" onClick={() => setShowSuccessModal(false)}>
+            <button
+              className="btn btn-success w-100 py-2 fw-bold"
+              onClick={() => setShowSuccessModal(false)}
+            >
               Close
             </button>
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        .topup-page-wrapper {
+          display: flex;
+          justify-content: center;
+          background: #f8f9fa;
+          min-height: 100vh;
+          padding: 0;
+          align-items: center;
+        }
+
+        @media (min-width: 768px) {
+          .topup-page-wrapper {
+            align-items: flex-start;
+            padding-top: 5vh;
+          }
+        }
+
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.4);
+          backdrop-filter: blur(5px);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1050;
+        }
+
+        .modal-card {
+          background: #fff;
+          padding: 2rem;
+          border-radius: 1rem;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-card.border-success {
+          border: 2px solid #28a745;
+        }
+
+        .otp-input {
+          width: 3rem;
+          height: 3rem;
+          font-size: 1.3rem;
+          border-radius: 0.5rem;
+        }
+
+        /* Responsive for small screens */
+        @media (max-width: 400px) {
+          .otp-input {
+            width: 2.3rem;
+            height: 2.3rem;
+            font-size: 1.1rem;
+          }
+          .modal-card {
+            padding: 1.5rem;
+          }
+        }
+
+        @keyframes dropIn {
+          0% { opacity: 0; transform: translateY(-30px) scale(0.95); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-drop-in { animation: dropIn 0.4s ease forwards; }
+      `}</style>
     </div>
   );
 }

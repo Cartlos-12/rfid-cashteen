@@ -173,7 +173,6 @@ export default function DashboardContent() {
       <table className="table table-hover align-middle">
         <thead className="table-light">
           <tr style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: '#f8f9fa' }}>
-            <th>ID</th>
             <th>Student</th>
             <th>Item</th>
             <th>Date</th>
@@ -188,7 +187,6 @@ export default function DashboardContent() {
                 <tr key={`${tx.id}-${it.id}`}>
                   {idx === 0 && (
                     <>
-                      <td rowSpan={tx.items.length}>{tx.id}</td>
                       <td rowSpan={tx.items.length}>{tx.user_name}</td>
                     </>
                   )}

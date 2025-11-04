@@ -11,6 +11,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import { Receipt, CashCoin } from 'react-bootstrap-icons';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -65,118 +66,213 @@ export default function DashboardPage() {
     );
 
     const maxIndex = totals.indexOf(Math.max(...totals));
-    const backgroundColors = totals.map((_, idx) => (idx === maxIndex ? '#198754' : '#0d6efd'));
+    const backgroundColors = totals.map((_, idx) => (idx === maxIndex ? '#4caf50' : '#2196f3'));
 
     return {
-      labels: last7Days.map(d => `${days[d.getDay()]} (${d.getDate()}/${d.getMonth() + 1})`),
+      labels: last7Days.map(d => days[d.getDay()]),
       datasets: [
         {
           label: 'Expenses (₱)',
           data: totals,
           backgroundColor: backgroundColors,
+          borderRadius: 6,
         },
       ],
     };
   }, [transactions]);
 
-  const totalThisWeek = useMemo(() => {
-    return weeklyData.datasets[0].data.reduce((sum, val) => sum + Number(val), 0);
-  }, [weeklyData]);
+  const summaryMetrics = useMemo(() => {
+    const totalTransactions = transactions.length;
+    const totalSpentThisWeek = weeklyData.datasets[0].data.reduce((sum, val) => sum + Number(val), 0);
+    return { totalTransactions, totalSpentThisWeek };
+  }, [transactions, weeklyData]);
 
-  if (loading) return <p className="text-center py-5 text-muted">Loading dashboard...</p>;
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '50vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-100 min-vh-100 py-3 px-3 px-md-4">
-      {/* Dashboard Grid */}
-      <div className="row g-3 mb-4">
-        {/* Total Spent Card */}
-        <div className="col-12 col-md-4">
-          <div className="card shadow-sm h-100 border-0">
-            <div className="card-body d-flex flex-column justify-content-center align-items-center py-4">
-              <h6 className="text-muted mb-2">Total Spent This Week</h6>
-              <h3 className="fw-bold text-success">₱{totalThisWeek.toFixed(2)}</h3>
-            </div>
+    <>
+      {/* Header */}
+      <div className="header w-100 justify-content-start mb-4">
+  <h2 className="text-primary-color">Dashboard Overview</h2>
+</div>
+
+      {/* Summary Metrics */}
+      <div className="summary-metrics mb-4">
+        <div className="metric-card">
+          <div className="icon-wrapper blue">
+            <Receipt size={32} />
+          </div>
+          <div className="metric-text">
+            <h6>Total Transactions</h6>
+            <h3>{summaryMetrics.totalTransactions}</h3>
           </div>
         </div>
 
-        {/* Weekly Expenses Chart */}
-        <div className="col-12 col-md-8">
-          <div className="card shadow-sm h-100 border-0">
-            <div className="card-body p-2" style={{ height: '280px' }}>
-              <Bar
-                data={weeklyData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { display: false },
-                    title: {
-                      display: true,
-                      text: 'Expenses in the Last 7 Days',
-                      font: { size: 12 },
-                    },
-                    tooltip: { enabled: true },
-                  },
-                  scales: {
-                    y: { beginAtZero: true, ticks: { stepSize: 50 } },
-                    x: { ticks: { font: { size: 10 } } },
-                  },
-                }}
-              />
-            </div>
+        <div className="metric-card">
+          <div className="icon-wrapper green">
+            <CashCoin size={32} />
+          </div>
+          <div className="metric-text">
+            <h6>Total Spent This Week</h6>
+            <h3>₱{summaryMetrics.totalSpentThisWeek.toFixed(2)}</h3>
           </div>
         </div>
       </div>
 
-      {/* Recent Purchases Table */}
-      <h4 className="fw-bold mb-3 text-primary">Recent Purchases</h4>
-      {transactions.length === 0 ? (
-        <p className="text-muted">No recent transactions.</p>
-      ) : (
-        <div className="table-responsive">
-          <table className="table table-striped table-hover align-middle">
-            <thead className="table-light">
-              <tr>
-                <th>User</th>
-                <th>Total (₱)</th>
-                <th>Status</th>
-                <th>Date</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map(tx => (
-                <tr key={tx.id}>
-                  <td>{tx.user_name}</td>
-                  <td>{Number(tx.total).toFixed(2)}</td>
-                  <td>
-                    <span
-                      className={`badge px-2 py-1 rounded-pill ${
-                        tx.status?.trim().toLowerCase() === 'completed'
-                          ? 'bg-success-subtle text-success'
-                          : tx.status?.trim().toLowerCase() === 'pending'
-                          ? 'bg-warning-subtle text-warning'
-                          : 'bg-danger-subtle text-danger'
-                      }`}
-                    >
-                      {tx.status}
-                    </span>
-                  </td>
-                  <td>{new Date(tx.created_at).toLocaleString()}</td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-outline-primary"
-                      onClick={() => alert(`View items for transaction #${tx.id}`)}
-                    >
-                      View Items
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+      {/* Weekly Chart */}
+      <div className="chart-card mb-4">
+        <Bar
+          data={weeklyData}
+          options={{
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              title: {
+                display: true,
+                text: 'Weekly Expenses',
+                font: { size: 18, weight: 'bold' },
+                color: '#333',
+              },
+            },
+            scales: {
+  y: {
+    beginAtZero: true,
+    ticks: {
+      stepSize: 50, // <-- sets the increment of y-axis labels
+      color: '#555', // optional: label color
+    },
+    grid: {
+      color: '#eee', // optional: grid line color
+    },
+  },
+  x: {
+    grid: { display: false },
+    ticks: {
+      color: '#555', // optional: x-axis label color
+    },
+  },
+}
+,
+          }}
+        />
+      </div>
+
+      {/* Recent Purchases */}
+      <div className="recent-purchases w-100">
+        <h4 className="text-primary-color">Recent Purchases</h4>
+        {transactions.length === 0 ? (
+          <div className="no-transactions">No recent transactions found.</div>
+        ) : (
+          <div className="table-card">
+            <div className="table-scroll-wrapper">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Total</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map(tx => (
+                    <tr key={tx.id}>
+                      <td>{tx.user_name}</td>
+                      <td className="text-success">₱{Number(tx.total).toFixed(2)}</td>
+                      <td>{new Date(tx.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <style jsx>{`
+        .summary-metrics {
+          display: flex;
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
+
+        /* ✅ Square & Modern Metric Cards */
+        .metric-card {
+          flex: 1;
+          min-width: 250px;
+          background: #fff;
+          border-radius: 12px;
+          padding: 16px;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+        }
+
+        .metric-text h6 {
+          margin: 0;
+          font-size: 0.9rem;
+          color: #666;
+        }
+
+        .metric-text h3 {
+          margin: 0;
+          font-size: 1.6rem;
+          font-weight: 700;
+          color: #222;
+        }
+
+        .icon-wrapper {
+          width: 48px;
+          height: 48px;
+          border-radius: 8px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          color: white;
+        }
+        .icon-wrapper.blue { background: #007bff; }
+        .icon-wrapper.green { background: #28a745; }
+
+        .chart-card {
+          width: 100%;
+          height: 350px;
+          padding: 12px;
+          background: #fff;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .table-card {
+          background: #fff;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .table-scroll-wrapper {
+          max-height: 380px;
+          overflow-y: auto;
+        }
+
+        .table th {
+          background: #e0f2ff !important;
+          position: sticky;
+          top: 0;
+        }
+
+        @media (max-width: 768px) {
+          .metric-card { min-width: 100%; }
+        }
+      `}</style>
+    </>
   );
 }

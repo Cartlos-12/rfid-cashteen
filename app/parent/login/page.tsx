@@ -1,24 +1,27 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import "bootstrap/dist/css/bootstrap.min.css";
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false); // ✅ Prevent hydration mismatch
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [show, setShow] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const showToast = (message: string, type: "success" | "error") => {
     setToastMessage(message);
     setToastType(type);
     setShow(true);
-
-    // Hide after 2s
     setTimeout(() => setShow(false), 1500);
   };
 
@@ -40,9 +43,11 @@ export default function LoginPage() {
     }
   };
 
+  // ✅ Avoid rendering before mount to prevent SSR/client mismatch
+  if (!mounted) return null;
+
   return (
     <div className="d-flex justify-content-center align-items-center vh-100 bg-light position-relative">
-
       {/* Toast */}
       <div
         className={`toast position-fixed top-0 end-0 m-3 p-0 border-0 shadow rounded-4 ${show ? 'show' : ''}`}
@@ -65,9 +70,8 @@ export default function LoginPage() {
           <div className="flex-grow-1 fw-semibold">{toastMessage}</div>
           <button type="button" className="btn-close btn-close-white" onClick={() => setShow(false)}></button>
         </div>
-        {/* Countdown line */}
         <div className="toast-progress-wrapper">
-          <div className={`toast-progress ${show ? "countdown" : "1000s"}`} />
+          <div className={`toast-progress ${show ? "countdown" : ""}`} />
         </div>
       </div>
 
@@ -78,7 +82,7 @@ export default function LoginPage() {
           <p className="text-muted">Access your receipts and account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
+        <form onSubmit={handleSubmit} className="d-flex flex-column gap-3" autoComplete="off">
           <div>
             <label className="form-label fw-semibold">Gsuite</label>
             <input
@@ -88,6 +92,7 @@ export default function LoginPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
+              autoComplete="new-email"
             />
           </div>
 
@@ -100,6 +105,7 @@ export default function LoginPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
+              autoComplete="new-password"
             />
           </div>
 

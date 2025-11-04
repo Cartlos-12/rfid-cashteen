@@ -39,9 +39,9 @@ export async function GET(req: NextRequest) {
 
     // Fetch all items for these transactions
     const [items] = await conn.query(
-      `SELECT transaction_id, item_name as name, price, quantity 
-       FROM transaction_items 
-       WHERE transaction_id IN (${transactionArray.map(() => "?").join(",")})`,
+      `SELECT id, item_name as name, price, quantity 
+       FROM transactions 
+       WHERE id IN (${transactionArray.map(() => "?").join(",")})`,
       transactionArray.map(tx => tx.id)
     );
 
