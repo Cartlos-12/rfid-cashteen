@@ -95,12 +95,13 @@ export default function ParentSidebarLayout({ student, children }: Props) {
     }
   };
 
-  const navLinkClass = (href: string) =>
-    `nav-link d-flex justify-content-start px-3 py-3 rounded-3 fw-semibold mb-1 ${
-      pathname === href
-        ? 'bg-white text-primary shadow-sm'
-        : 'text-white opacity-85 hover-opacity-100'
+  // ✅ Updated nav link class: exact match highlighting
+  const navLinkClass = (href: string) => {
+    const isActive = pathname === href;
+    return `nav-link d-flex justify-content-start px-3 py-3 rounded-3 fw-semibold mb-1 ${
+      isActive ? 'bg-white text-primary shadow-sm' : 'text-white opacity-85 hover-opacity-100'
     }`;
+  };
 
   if (!sessionChecked || !sessionValid) return null;
 
@@ -172,6 +173,9 @@ export default function ParentSidebarLayout({ student, children }: Props) {
             <Link href="/parent/topup" className={navLinkClass('/parent/topup')} onClick={() => setSidebarOpen(false)}>
               <CashCoin size={20} /> <span className="ms-3">Load Money</span>
             </Link>
+            <Link href="/parent/limit" className={navLinkClass('/parent/limit')} onClick={() => setSidebarOpen(false)}>
+              <CashCoin size={20} /> <span className="ms-3">Limit Spending</span>
+            </Link>
             <Link href="/parent/topup-history" className={navLinkClass('/parent/topup-history')} onClick={() => setSidebarOpen(false)}>
               <ClockHistory size={20} /> <span className="ms-3">Load History</span>
             </Link>
@@ -226,7 +230,7 @@ export default function ParentSidebarLayout({ student, children }: Props) {
           z-index: 1100;
         }
 
-        /* Overlay for Mobile Sidebar with smooth transition */
+        /* Overlay for Mobile Sidebar */
         .overlay {
           position: fixed;
           inset: 0;
@@ -253,7 +257,6 @@ export default function ParentSidebarLayout({ student, children }: Props) {
           z-index: 1;
         }
 
-        /* Page Content Wrapper */
         .content-wrapper {
           max-width: 1200px;
           margin: 0 auto;
@@ -261,21 +264,19 @@ export default function ParentSidebarLayout({ student, children }: Props) {
           padding: 1rem;
         }
 
-        /* Mobile: push content below top bar */
         @media (max-width: 767px) {
           .content-wrapper {
-            padding-top: 80px; /* Space for top bar */
+            padding-top: 80px;
           }
         }
 
-        /* Desktop Sidebar layout */
         @media (min-width: 768px) {
           .sidebar {
             transform: none;
             z-index: 1050;
           }
           .main-content {
-            margin-left: 280px; /* Sidebar width */
+            margin-left: 280px;
           }
           .content-wrapper {
             padding-top: 1.5rem;

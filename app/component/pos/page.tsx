@@ -67,6 +67,7 @@ export default function CashierPOS() {
 
   const [showLowBalanceModal, setShowLowBalanceModal] = useState(false);
   const [showInvalidModal, setShowInvalidModal] = useState(false);
+  const [showExceededLimitModal, setShowExceededLimitModal] = useState(false);
 
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -246,10 +247,22 @@ const fetchCustomer = async (rfid: string) => {
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        setShowInvalidModal(true);
-        return;
-      }
+
+if (!res.ok) {
+  if (data.error === "EXCEEDED_LIMIT") {
+    setShowExceededLimitModal(true);
+  } else if (data.error === "LOW_BALANCE") {
+    setShowLowBalanceModal(true);
+  } else if (data.error === "INVALID_RFID") {
+    setShowInvalidModal(true);
+  } else {
+    setErrorMessage(data.error || "Checkout failed.");
+    setShowFailureModal(true);
+  }
+  return;
+}
+
+      
 
       const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const payload: ReceiptData = {
@@ -767,8 +780,7 @@ const handleDeleteItem = async () => {
           </div>
         </div>
       )}
-
-     
+      {/* Exceeded Daily Limit Modal */}     
 {showReceiptModal && receiptData && (
   <div
     className="modal d-block"

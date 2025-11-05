@@ -54,13 +54,14 @@ export async function GET(req: NextRequest) {
 
     const email = parentRows[0].email;
 
-    // 🔍 Build search/filter query
+    // 🔍 Build search/filter query (match ID, Amount, or Date)
     let whereClause = 'WHERE email = ?';
     const queryParams: any[] = [email];
 
     if (search) {
-      whereClause += ' AND (rfid LIKE ? OR wallet LIKE ?)';
-      queryParams.push(`%${search}%`, `%${search}%`);
+      // Use OR conditions for id, amount, and created_at date
+      whereClause += ' AND (id LIKE ? OR amount LIKE ? OR DATE(created_at) LIKE ?)';
+      queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     // 📊 Count total records

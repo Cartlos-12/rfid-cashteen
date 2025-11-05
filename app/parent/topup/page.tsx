@@ -5,20 +5,19 @@ import { useEffect, useState, useRef } from 'react';
 export default function TopUpPage() {
   const [student, setStudent] = useState<{ rfid: string } | null>(null);
   const [amount, setAmount] = useState('');
-  const [wallet, setWallet] = useState('gcash');
+  const [wallet, setWallet] = useState('Gcash');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [otpCountdown, setOtpCountdown] = useState(300); // 5 minutes
+  const [otpCountdown, setOtpCountdown] = useState(300);
   const [canResend, setCanResend] = useState(false);
 
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
   const countdownInterval = useRef<number | null>(null);
 
-  // Fetch student RFID
   useEffect(() => {
     async function fetchStudent() {
       try {
@@ -26,20 +25,18 @@ export default function TopUpPage() {
         const data = await res.json();
         if (res.ok && data.success) setStudent({ rfid: data.student.rfid });
         else setOtpError('⚠️ Could not fetch RFID info.');
-      } catch (err) {
-        console.error(err);
+      } catch {
         setOtpError('⚠️ Error fetching RFID info.');
       }
     }
     fetchStudent();
   }, []);
 
-  // Handle OTP countdown
   useEffect(() => {
     if (showOtpModal && isOtpSent && otpCountdown > 0) {
       if (countdownInterval.current === null) {
         countdownInterval.current = window.setInterval(() => {
-          setOtpCountdown(prev => prev - 1);
+          setOtpCountdown((prev) => prev - 1);
         }, 1000);
       }
     } else if (otpCountdown <= 0 && countdownInterval.current !== null) {
@@ -81,13 +78,12 @@ export default function TopUpPage() {
       if (res.ok && data.success) {
         setIsOtpSent(true);
         setShowOtpModal(true);
-        setOtpCountdown(300); // reset 5 min
+        setOtpCountdown(300);
         setCanResend(false);
         setOtpError('OTP sent to your email.');
         setTimeout(() => otpRefs.current[0]?.focus(), 100);
       } else setOtpError(`❌ ${data.message || 'Failed to send OTP.'}`);
-    } catch (err) {
-      console.error(err);
+    } catch {
       setOtpError('⚠️ Something went wrong sending OTP.');
     } finally {
       setIsLoading(false);
@@ -123,7 +119,7 @@ export default function TopUpPage() {
 
       if (res.ok && data.success) {
         setAmount('');
-        setWallet('gcash');
+        setWallet('Gcash');
         setOtp(['', '', '', '', '', '']);
         setShowOtpModal(false);
         setShowSuccessModal(true);
@@ -134,8 +130,7 @@ export default function TopUpPage() {
       } else {
         setOtpError(` ${data.message || 'OTP is invalid or expired.'}`);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setOtpError('⚠️ Server error during top-up.');
     } finally {
       setIsLoading(false);
@@ -143,13 +138,13 @@ export default function TopUpPage() {
   };
 
   return (
-    <div className="topup-page-wrapper">
+    <>
       <div
-        className="card shadow-lg animate-drop-in"
-        style={{ maxWidth: '480px', width: '100%', borderRadius: '1rem', marginTop: '1rem' }}
+        className="card shadow-lg animate-drop-in mx-auto mt-5"
+        style={{ maxWidth: '480px', width: '100%', borderRadius: '1rem' }}
       >
         <div className="card-body p-4">
-          <h3 className="text-center text-primary fw-bold mb-3">Load RFID Balance</h3>
+          <h3 className="text-center text-dark fw-bold mb-3">Load RFID Balance</h3>
           <p className="text-center text-muted mb-4">Confirm your details before proceeding.</p>
 
           <div className="mb-3">
@@ -175,7 +170,7 @@ export default function TopUpPage() {
               step={50}
               style={{ fontWeight: '500' }}
             />
-            {!amount && <p className="text-danger justify-content-start text-mute mt-1">Please enter an amount.</p>}
+            {!amount && <p className="text-danger mt-1 small">Please enter an amount.</p>}
           </div>
 
           <div className="mb-4">
@@ -185,7 +180,7 @@ export default function TopUpPage() {
               value={wallet}
               onChange={(e) => setWallet(e.target.value)}
             >
-              <option value="gcash">GCash</option>
+              <option value="Gcash">Gcash</option>
             </select>
           </div>
 
@@ -213,11 +208,13 @@ export default function TopUpPage() {
             </p>
             {otpError && <p className="text-center text-danger mb-3">{otpError}</p>}
 
-            <div className="d-flex justify-content-center gap-2 mb-3 flex-wrap">
+            <div className="otp-container mb-3">
               {otp.map((digit, idx) => (
                 <input
                   key={idx}
-                  ref={(el: HTMLInputElement | null) => { if (el) otpRefs.current[idx] = el; }}
+                  ref={(el: HTMLInputElement | null) => {
+                    if (el) otpRefs.current[idx] = el;
+                  }}
                   type="text"
                   value={digit}
                   onChange={(e) => handleOtpChange(idx, e.target.value)}
@@ -273,20 +270,30 @@ export default function TopUpPage() {
       )}
 
       <style jsx>{`
-        .topup-page-wrapper {
+        .otp-container {
           display: flex;
           justify-content: center;
-          background: #f8f9fa;
-          min-height: 100vh;
-          padding: 0;
-          align-items: center;
+          flex-wrap: nowrap;
+          gap: 0.5rem;
         }
 
-        @media (min-width: 768px) {
-          .topup-page-wrapper {
-            align-items: flex-start;
-            padding-top: 5vh;
+        @media (max-width: 400px) {
+          .otp-container {
+            flex-wrap: nowrap;
+            gap: 0.4rem;
           }
+          .otp-input {
+            width: 2.4rem !important;
+            height: 2.4rem !important;
+            font-size: 1.1rem;
+          }
+        }
+
+        .otp-input {
+          width: 3rem;
+          height: 3rem;
+          font-size: 1.3rem;
+          border-radius: 0.5rem;
         }
 
         .modal-overlay {
@@ -313,31 +320,20 @@ export default function TopUpPage() {
           border: 2px solid #28a745;
         }
 
-        .otp-input {
-          width: 3rem;
-          height: 3rem;
-          font-size: 1.3rem;
-          border-radius: 0.5rem;
-        }
-
-        /* Responsive for small screens */
-        @media (max-width: 400px) {
-          .otp-input {
-            width: 2.3rem;
-            height: 2.3rem;
-            font-size: 1.1rem;
-          }
-          .modal-card {
-            padding: 1.5rem;
-          }
-        }
-
         @keyframes dropIn {
-          0% { opacity: 0; transform: translateY(-30px) scale(0.95); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
+          0% {
+            opacity: 0;
+            transform: translateY(-30px) scale(0.95);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
-        .animate-drop-in { animation: dropIn 0.4s ease forwards; }
+        .animate-drop-in {
+          animation: dropIn 0.4s ease forwards;
+        }
       `}</style>
-    </div>
+    </>
   );
 }

@@ -101,8 +101,8 @@ export default function DashboardPage() {
     <>
       {/* Header */}
       <div className="header w-100 justify-content-start mb-4">
-  <h2 className="text-primary-color">Dashboard Overview</h2>
-</div>
+        <h2 className="text-primary-color">Dashboard Overview</h2>
+      </div>
 
       {/* Summary Metrics */}
       <div className="summary-metrics mb-4">
