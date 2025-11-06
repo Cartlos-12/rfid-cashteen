@@ -14,9 +14,13 @@ export default function TopUpPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(300);
   const [canResend, setCanResend] = useState(false);
+  const [loadingStudent, setLoadingStudent] = useState(true);
 
-  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const otpRefs = useRef<Array<HTMLInputElement | null>>(Array(6).fill(null));
   const countdownInterval = useRef<number | null>(null);
+  const setOtpRef = (index: number) => (el: HTMLInputElement | null) => {
+    otpRefs.current[index] = el;
+  };
 
   useEffect(() => {
     async function fetchStudent() {
@@ -27,6 +31,8 @@ export default function TopUpPage() {
         else setOtpError('⚠️ Could not fetch RFID info.');
       } catch {
         setOtpError('⚠️ Error fetching RFID info.');
+      } finally {
+        setLoadingStudent(false);
       }
     }
     fetchStudent();
@@ -45,7 +51,6 @@ export default function TopUpPage() {
       setCanResend(true);
       setOtpError('⏰ OTP expired. Please resend.');
     }
-
     return () => {
       if (countdownInterval.current !== null) {
         clearInterval(countdownInterval.current);
@@ -65,7 +70,6 @@ export default function TopUpPage() {
       setOtpError('⚠️ Please fill in all required fields.');
       return;
     }
-
     setIsLoading(true);
     setOtpError('');
     try {
@@ -103,11 +107,9 @@ export default function TopUpPage() {
     e?.preventDefault();
     if (!student) return setOtpError('⚠️ RFID not found.');
     if (otp.some((d) => !d)) return setOtpError('⚠️ Please complete the OTP.');
-
     const otpValue = otp.join('');
     setIsLoading(true);
     setOtpError('');
-
     try {
       const res = await fetch('/parent/api/topup', {
         method: 'POST',
@@ -116,7 +118,6 @@ export default function TopUpPage() {
         credentials: 'include',
       });
       const data = await res.json();
-
       if (res.ok && data.success) {
         setAmount('');
         setWallet('Gcash');
@@ -139,61 +140,63 @@ export default function TopUpPage() {
 
   return (
     <>
-      <div
-        className="card shadow-lg animate-drop-in mx-auto mt-5"
-        style={{ maxWidth: '480px', width: '100%', borderRadius: '1rem' }}
-      >
-        <div className="card-body p-4">
+      <div className="topup-card card shadow-lg mx-auto mt-5">
+        <div className="card-body p-5">
           <h3 className="text-center text-dark fw-bold mb-3">Load RFID Balance</h3>
           <p className="text-center text-muted mb-4">Confirm your details before proceeding.</p>
 
-          <div className="mb-3">
-            <label className="form-label fw-semibold">RFID Tag</label>
-            <input
-              type="text"
-              className="form-control text-center fw-bold"
-              value={student?.rfid ?? 'Loading...'}
-              disabled
-              style={{ fontSize: '1.1rem' }}
-            />
-          </div>
+          {/* Skeleton Loader */}
+          {loadingStudent ? (
+            <div className="skeleton-wrapper">
+              <div className="skeleton skeleton-input mb-3"></div>
+              <div className="skeleton skeleton-input mb-3"></div>
+              <div className="skeleton skeleton-input mb-3"></div>
+              <div className="skeleton skeleton-btn mb-3"></div>
+            </div>
+          ) : (
+            <>
+              <div className="mb-3">
+                <label className="form-label fw-semibold">RFID Tag</label>
+                <input
+                  type="text"
+                  className="form-control text-center fw-bold"
+                  value={student?.rfid ?? 'Loading...'}
+                  disabled
+                />
+              </div>
 
-          <div className="mb-3">
-            <label className="form-label fw-semibold">Amount (₱)</label>
-            <input
-              type="number"
-              className="form-control"
-              placeholder="Enter amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              min={50}
-              step={50}
-              style={{ fontWeight: '500' }}
-            />
-            {!amount && <p className="text-danger mt-1 small">Please enter an amount.</p>}
-          </div>
+              <div className="mb-3">
+                <label className="form-label fw-semibold">Amount (₱)</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  placeholder="Enter amount"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  min={50}
+                  step={50}
+                />
+              </div>
 
-          <div className="mb-4">
-            <label className="form-label fw-semibold">E-Wallet</label>
-            <select
-              className="form-select"
-              value={wallet}
-              onChange={(e) => setWallet(e.target.value)}
-            >
-              <option value="Gcash">Gcash</option>
-            </select>
-          </div>
+              <div className="mb-4">
+                <label className="form-label fw-semibold">E-Wallet</label>
+                <select className="form-select" value={wallet} onChange={(e) => setWallet(e.target.value)}>
+                  <option value="Gcash">Gcash</option>
+                </select>
+              </div>
 
-          {otpError && <p className="text-center text-danger mb-3">{otpError}</p>}
+              {otpError && <p className="text-center text-danger mb-3">{otpError}</p>}
 
-          <button
-            className="btn btn-primary w-100 py-2 fw-bold"
-            onClick={handleSendOtp}
-            disabled={isLoading || !student?.rfid || !amount}
-          >
-            {isLoading && <span className="spinner-border spinner-border-sm text-light me-2"></span>}
-            Confirm
-          </button>
+              <button
+                className="btn btn-primary w-100 py-2 fw-bold"
+                onClick={handleSendOtp}
+                disabled={isLoading || !student?.rfid || !amount}
+              >
+                {isLoading && <span className="spinner-border spinner-border-sm text-light me-2"></span>}
+                Confirm
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -208,43 +211,43 @@ export default function TopUpPage() {
             </p>
             {otpError && <p className="text-center text-danger mb-3">{otpError}</p>}
 
-            <div className="otp-container mb-3">
-              {otp.map((digit, idx) => (
-                <input
-                  key={idx}
-                  ref={(el: HTMLInputElement | null) => {
-                    if (el) otpRefs.current[idx] = el;
-                  }}
-                  type="text"
-                  value={digit}
-                  onChange={(e) => handleOtpChange(idx, e.target.value)}
-                  maxLength={1}
-                  className="form-control text-center fw-bold otp-input"
-                />
-              ))}
-            </div>
+            {/* Skeleton for OTP Inputs */}
+            {isLoading ? (
+              <div className="otp-container">
+                {otp.map((_, idx) => (
+                  <div key={idx} className="skeleton skeleton-otp"></div>
+                ))}
+              </div>
+            ) : (
+              <div className="otp-container mb-3">
+                {otp.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={setOtpRef(idx)}
+                    type="text"
+                    value={digit}
+                    onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    maxLength={1}
+                    className="form-control text-center fw-bold otp-input"
+                  />
+                ))}
+              </div>
+            )}
 
             <button
-              className="btn btn-primary w-100 mb-2 py-2 fw-bold d-flex justify-content-center align-items-center gap-2"
+              className="btn btn-primary w-100 mb-2 py-2 fw-bold"
               onClick={handleTopup}
               disabled={isLoading || otpCountdown <= 0}
             >
-              {isLoading && <span className="spinner-border spinner-border-sm text-light"></span>}
+              {isLoading && <span className="spinner-border spinner-border-sm text-light me-2"></span>}
               Proceed
             </button>
 
-            <button
-              className="btn btn-outline-secondary w-100 mb-2 py-2"
-              onClick={() => setShowOtpModal(false)}
-            >
+            <button className="btn btn-outline-secondary w-100 mb-2 py-2" onClick={() => setShowOtpModal(false)}>
               Cancel
             </button>
 
-            <button
-              className="btn btn-link w-100 py-1"
-              onClick={handleSendOtp}
-              disabled={!canResend}
-            >
+            <button className="btn btn-link w-100 py-1" onClick={handleSendOtp} disabled={!canResend}>
               Resend OTP
             </button>
           </div>
@@ -260,7 +263,7 @@ export default function TopUpPage() {
               <p className="text-muted">Your RFID balance has been updated.</p>
             </div>
             <button
-              className="btn btn-success w-100 py-2 fw-bold"
+              className="btn btn-success w-100 py-2 fw-bold btn-gradient-success"
               onClick={() => setShowSuccessModal(false)}
             >
               Close
@@ -270,68 +273,104 @@ export default function TopUpPage() {
       )}
 
       <style jsx>{`
+        /* Card */
+        .topup-card {
+          max-width: 480px;
+          width: 90%;
+          border-radius: 1rem;
+          background: linear-gradient(135deg, #ffffff, #f9fafb);
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+          transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .topup-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Buttons */
+        .btn-gradient {
+          background: linear-gradient(135deg, #3b82f6, #60a5fa);
+          border: none;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-gradient:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+        }
+        .btn-gradient-success {
+          background: linear-gradient(135deg, #22c55e, #4ade80);
+          border: none;
+        }
+
+        /* Skeleton */
+        .skeleton-wrapper {
+          display: flex;
+          flex-direction: column;
+          gap: 0.8rem;
+        }
+        .skeleton {
+          background-color: #e0e0e0;
+          border-radius: 0.5rem;
+          animation: pulse 1.2s infinite ease-in-out;
+        }
+        .skeleton-input { height: 2.5rem; width: 100%; }
+        .skeleton-btn { height: 2.8rem; width: 100%; }
+        .skeleton-otp { width: 3rem; height: 3rem; border-radius: 0.5rem; }
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.4; }
+          100% { opacity: 1; }
+        }
+
+        /* OTP Inputs */
         .otp-container {
           display: flex;
           justify-content: center;
-          flex-wrap: nowrap;
           gap: 0.5rem;
         }
-
-        @media (max-width: 400px) {
-          .otp-container {
-            flex-wrap: nowrap;
-            gap: 0.4rem;
-          }
-          .otp-input {
-            width: 2.4rem !important;
-            height: 2.4rem !important;
-            font-size: 1.1rem;
-          }
-        }
-
         .otp-input {
           width: 3rem;
           height: 3rem;
           font-size: 1.3rem;
           border-radius: 0.5rem;
+          transition: border 0.2s, box-shadow 0.2s;
+        }
+        .otp-input:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
+          outline: none;
         }
 
+        /* Modals */
         .modal-overlay {
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.4);
+          background: rgba(0, 0, 0, 0.35);
           backdrop-filter: blur(5px);
           display: flex;
           justify-content: center;
           align-items: center;
           z-index: 1050;
         }
-
         .modal-card {
           background: #fff;
           padding: 2rem;
           border-radius: 1rem;
           max-width: 400px;
           width: 90%;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
+        .modal-card.border-success { border: 2px solid #28a745; }
 
-        .modal-card.border-success {
-          border: 2px solid #28a745;
-        }
-
+        /* Animations */
         @keyframes dropIn {
-          0% {
-            opacity: 0;
-            transform: translateY(-30px) scale(0.95);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
+          0% { opacity: 0; transform: translateY(-30px) scale(0.95); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .animate-drop-in {
-          animation: dropIn 0.4s ease forwards;
+        .animate-drop-in { animation: dropIn 0.4s ease forwards; }
+
+        @media (max-width: 480px) {
+          .otp-input, .skeleton-otp { width: 2.4rem; height: 2.4rem; font-size: 1.1rem; }
         }
       `}</style>
     </>

@@ -22,94 +22,87 @@ type Student = {
 };
 
 interface Props {
-  student: Student | null;
   children: ReactNode;
 }
 
-export default function ParentSidebarLayout({ student, children }: Props) {
+export default function ParentSidebarLayout({ children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sessionChecked, setSessionChecked] = useState(false);
-  const [sessionValid, setSessionValid] = useState(false);
+  const [student, setStudent] = useState<Student | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // ✅ Session Validation
   useEffect(() => {
-    let isMounted = true;
-    let intervalId: NodeJS.Timeout;
+    let cancelled = false;
 
-    const expireSession = () => {
-      setSessionValid(false);
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.replace('/parent/login');
-    };
-
-    const checkSession = async () => {
+    const verifySession = async () => {
       try {
-        const res = await fetch('/parent/api/auth/check', { credentials: 'include' });
-        if (!res.ok) throw new Error('Session invalid');
-        if (isMounted) {
-          setSessionValid(true);
-          setSessionChecked(true);
-          if (window.location.pathname === '/parent/login') {
-            window.location.replace('/parent/dashboard');
-          }
-        }
+        const checkRes = await fetch('/parent/api/auth/check', { credentials: 'include', cache: 'no-store' });
+        if (!checkRes.ok) throw new Error('Unauthorized');
+
+        const meRes = await fetch('/parent/api/auth/me', { credentials: 'include', cache: 'no-store' });
+        const meData = await meRes.json();
+        if (!meRes.ok || !meData.success) throw new Error('Not authenticated');
+
+        if (!cancelled) setStudent({ ...meData.data, rfid: meData.data.rfid || '' });
       } catch {
-        expireSession();
+        if (!cancelled) router.replace('/parent/login');
+      } finally {
+        if (!cancelled) setCheckingSession(false);
       }
     };
 
-    checkSession();
-    intervalId = setInterval(checkSession, 30000);
+    verifySession();
 
-    const handlePopState = () => checkSession();
-    const handleVisibilityChange = () => !document.hidden && checkSession();
+    const handleVisibilityChange = () => { if (document.visibilityState === 'visible') verifySession(); };
+    const handlePopState = () => verifySession();
 
-    window.addEventListener('popstate', handlePopState);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    window.onpageshow = (e) => e.persisted && checkSession();
+    window.addEventListener('popstate', handlePopState);
 
     return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-      window.removeEventListener('popstate', handlePopState);
+      cancelled = true;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.onpageshow = null;
+      window.removeEventListener('popstate', handlePopState);
     };
-  }, [pathname, router]);
+  }, [router]);
 
-  // ✅ Logout
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     try {
       await fetch('/parent/api/auth/logout', { method: 'POST', credentials: 'include' });
-    } catch {
-      /* ignore */
     } finally {
-      setSessionValid(false);
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.replace('/parent/login');
+      router.replace('/parent/login');
     }
   };
 
-  // ✅ Updated nav link class: exact match highlighting
+  if (checkingSession || isLoggingOut) {
+    return (
+      <div className="d-flex justify-content-center align-items-center vh-100 bg-light">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
   const navLinkClass = (href: string) => {
     const isActive = pathname === href;
     return `nav-link d-flex justify-content-start px-3 py-3 rounded-3 fw-semibold mb-1 ${
       isActive ? 'bg-white text-primary shadow-sm' : 'text-white opacity-85 hover-opacity-100'
     }`;
   };
-
-  if (!sessionChecked || !sessionValid) return null;
-
+  
   return (
     <div className="layout-wrapper d-flex">
       {/* Mobile Top Bar */}
       <div className="mobile-topbar d-md-none bg-primary text-white d-flex justify-content-between align-items-center px-3 py-3 position-fixed top-0 start-0 w-100 shadow-sm">
-        <button className="btn text-white border-0 bg-transparent" onClick={() => setSidebarOpen(true)}>
+        <button
+          className="btn text-white border-0 bg-transparent"
+          onClick={() => setSidebarOpen(true)}
+        >
           <List size={24} />
         </button>
         <h5 className="mb-0 fw-bold">Parent Portal</h5>
@@ -133,9 +126,8 @@ export default function ParentSidebarLayout({ student, children }: Props) {
         </div>
 
         <div className="p-3 flex-grow-1 overflow-auto">
-          {/* Student Info */}
-          <div className="card text-black mb-4 border-0 rounded-4 shadow-sm bg-white">
-            {student ? (
+          {student && (
+            <div className="card text-black mb-4 border-0 rounded-4 shadow-sm bg-white">
               <div className="p-3">
                 <div className="d-flex align-items-center mb-3">
                   <div
@@ -156,14 +148,8 @@ export default function ParentSidebarLayout({ student, children }: Props) {
                   </p>
                 </div>
               </div>
-            ) : (
-              <div className="placeholder-glow p-3">
-                <div className="placeholder col-12 mb-3" />
-                <div className="placeholder col-8 mb-2" />
-                <div className="placeholder col-6" />
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Nav Links */}
           <nav className="nav flex-column">
@@ -185,11 +171,16 @@ export default function ParentSidebarLayout({ student, children }: Props) {
           </nav>
         </div>
 
+        {/* Logout */}
         <div className="p-3 border-top border-white-25">
           <button
             onClick={handleLogout}
             className="btn w-100 fw-bold d-flex align-items-center justify-content-center gap-2 border-0 text-white"
-            style={{ backgroundColor: '#dc3545', borderRadius: '8px', padding: '10px 0' }}
+            style={{
+              backgroundColor: '#dc3545',
+              borderRadius: '8px',
+              padding: '10px 0',
+            }}
           >
             <BoxArrowRight size={18} />
             Logout
@@ -198,18 +189,21 @@ export default function ParentSidebarLayout({ student, children }: Props) {
       </aside>
 
       {/* Overlay for Mobile */}
-      <div className={`overlay ${sidebarOpen ? 'active' : ''}`} onClick={() => setSidebarOpen(false)} />
+      <div
+        className={`overlay ${sidebarOpen ? 'active' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
 
+      {/* Main Content */}
       <main className="main-content flex-grow-1 bg-light">
-        <div className="content-wrapper">{children}</div>
+        <div className="content-wrapper fade-in">{children}</div>
       </main>
 
+      {/* Styles */}
       <style jsx>{`
         .bg-gradient-primary {
           background: linear-gradient(135deg, #007bff, #0056b3);
         }
-
-        /* Sidebar Styling */
         .sidebar {
           width: 270px;
           position: fixed;
@@ -220,17 +214,12 @@ export default function ParentSidebarLayout({ student, children }: Props) {
           transition: transform 0.3s ease-in-out;
           z-index: 1200;
         }
-
         .sidebar.open {
           transform: translateX(0);
         }
-
-        /* Mobile Top Bar */
         .mobile-topbar {
           z-index: 1100;
         }
-
-        /* Overlay for Mobile Sidebar */
         .overlay {
           position: fixed;
           inset: 0;
@@ -245,8 +234,6 @@ export default function ParentSidebarLayout({ student, children }: Props) {
           opacity: 1;
           pointer-events: auto;
         }
-
-        /* Main Content Area */
         .main-content {
           min-height: 100vh;
           width: 100%;
@@ -256,20 +243,24 @@ export default function ParentSidebarLayout({ student, children }: Props) {
           position: relative;
           z-index: 1;
         }
-
         .content-wrapper {
           max-width: 1200px;
           margin: 0 auto;
           width: 100%;
           padding: 1rem;
         }
-
+        .fade-in {
+          animation: fadeIn 0.3s ease-in-out forwards;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
         @media (max-width: 767px) {
-          .content-wrapper {
+          .main-content {
             padding-top: 80px;
           }
         }
-
         @media (min-width: 768px) {
           .sidebar {
             transform: none;
@@ -277,9 +268,6 @@ export default function ParentSidebarLayout({ student, children }: Props) {
           }
           .main-content {
             margin-left: 280px;
-          }
-          .content-wrapper {
-            padding-top: 1.5rem;
           }
         }
       `}</style>
