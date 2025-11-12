@@ -12,7 +12,7 @@ import {
   BoxArrowRight,
   List,
   X,
-  Gear,
+  ThreeDotsVertical,
 } from 'react-bootstrap-icons';
 
 type Student = {
@@ -35,21 +35,45 @@ export default function ParentSidebarLayout({ children }: Props) {
   const [student, setStudent] = useState<Student | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
+  // Password modal states
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+const [toastType, setToastType] = useState<'success' | 'error'>('success');
+const [showToast, setShowToast] = useState(false);
+
+const showBootstrapToast = (message: string, type: 'success' | 'error' = 'success') => {
+  setToastMessage(message);
+  setToastType(type);
+  setShowToast(true);
+  setTimeout(() => setShowToast(false), 4000);
+};
+
+
+  // Verify session
   useEffect(() => {
     let cancelled = false;
-
     const verifySession = async () => {
       try {
-        const checkRes = await fetch('/parent/api/auth/check', { credentials: 'include', cache: 'no-store' });
+        const checkRes = await fetch('/parent/api/auth/check', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
         if (!checkRes.ok) throw new Error('Unauthorized');
 
-        const meRes = await fetch('/parent/api/auth/me', { credentials: 'include', cache: 'no-store' });
+        const meRes = await fetch('/parent/api/auth/me', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
         const meData = await meRes.json();
         if (!meRes.ok || !meData.success) throw new Error('Not authenticated');
-
-        if (!cancelled) setStudent({ ...meData.data, rfid: meData.data.rfid || '' });
+        if (!cancelled)
+          setStudent({ ...meData.data, rfid: meData.data.rfid || '' });
       } catch {
         if (!cancelled) router.replace('/parent/login');
       } finally {
@@ -58,7 +82,6 @@ export default function ParentSidebarLayout({ children }: Props) {
     };
 
     verifySession();
-
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') verifySession();
     };
@@ -77,11 +100,50 @@ export default function ParentSidebarLayout({ children }: Props) {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      await fetch('/parent/api/auth/logout', { method: 'POST', credentials: 'include' });
+      await fetch('/parent/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
     } finally {
       router.replace('/parent/login');
     }
   };
+
+  const handleChangePassword = async () => {
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    showBootstrapToast('All fields are required', 'error');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    showBootstrapToast('New password and confirmation do not match', 'error');
+    return;
+  }
+
+  setIsSaving(true);
+  try {
+    const res = await fetch('/parent/api/change', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      showBootstrapToast('Password updated successfully', 'success');
+      setShowChangePasswordModal(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } else {
+      showBootstrapToast(data.message || 'Failed to update password', 'error');
+    }
+  } catch (err) {
+    showBootstrapToast('Something went wrong', 'error');
+  } finally {
+    setIsSaving(false);
+  }
+};
+
 
   if (checkingSession || isLoggingOut) {
     return (
@@ -95,12 +157,12 @@ export default function ParentSidebarLayout({ children }: Props) {
 
   const navLinkClass = (href: string) => {
     const isActive = pathname === href;
-    return `nav-link d-flex justify-content-start px-3 py-3 rounded-3 fw-semibold mb-1 <w-200px> ${
-      isActive ? 'bg-white text-primary shadow-sm' : 'text-white opacity-85 hover-opacity-100' 
+    return `nav-link d-flex justify-content-start px-3 py-3 rounded-3 fw-semibold mb-1 ${
+      isActive
+        ? 'bg-white text-primary shadow-sm'
+        : 'text-white opacity-85 hover-opacity-100'
     }`;
   };
-
-  const handleBackdropClick = (e: React.MouseEvent) => e.currentTarget === e.target && setShowProfileModal(false);
 
   return (
     <div className="layout-wrapper d-flex">
@@ -113,8 +175,52 @@ export default function ParentSidebarLayout({ children }: Props) {
           <List size={24} />
         </button>
         <h5 className="mb-0 fw-bold">Parent Portal</h5>
-        <div style={{ width: '24px' }} />
+        <button
+          className="btn text-white border-0 bg-transparent"
+          onClick={() => setShowDropdown(!showDropdown)}
+        >
+          <ThreeDotsVertical size={22} />
+        </button>
+
+        {showDropdown && (
+          <div className="dropdown-menu show position-absolute end-0 mt-5 me-2 shadow rounded-3 bg-white">
+            <button
+              className="dropdown-item"
+              onClick={() => {
+                setShowDropdown(false);
+                setShowChangePasswordModal(true);
+              }}
+            >
+              Change Password
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Toast Notification */}
+<div
+  className="position-fixed top-0 end-0 p-3"
+  style={{ zIndex: 2000 }}
+>
+  {showToast && (
+    <div
+      className={`toast show align-items-center text-white ${
+        toastType === 'success' ? 'bg-success' : 'bg-danger'
+      } border-0`}
+      role="alert"
+    >
+      <div className="d-flex">
+        <div className="toast-body">{toastMessage}</div>
+        <button
+          type="button"
+          className="btn-close btn-close-white me-2 m-auto"
+          onClick={() => setShowToast(false)}
+        />
+      </div>
+    </div>
+  )}
+</div>
+
 
       {/* Sidebar */}
       <aside
@@ -124,68 +230,102 @@ export default function ParentSidebarLayout({ children }: Props) {
       >
         <div className="d-flex justify-content-between align-items-center p-3 border-bottom border-white-25">
           <h6 className="mb-0 fw-bold">Parent Portal</h6>
-          
-          <button
-            className="btn btn-sm text-white d-md-none border-0 bg-transparent"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X size={20} />
-          </button>
+          <div className="d-flex align-items-center">
+            <div className="d-none d-md-block position-relative">
+              <button
+                className="btn text-white border-0 bg-transparent"
+                onClick={() => setShowDropdown(!showDropdown)}
+              >
+                <ThreeDotsVertical size={22} />
+              </button>
+              {showDropdown && (
+                <div className="dropdown-menu show position-absolute end-0 mt-2 shadow rounded-3 bg-white">
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      setShowDropdown(false);
+                      setShowChangePasswordModal(true);
+                    }}
+                  >
+                    Change Password
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              className="btn btn-sm text-white d-md-none border-0 bg-transparent ms-2"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="p-3 flex-grow-1 overflow-auto">
           {student && (
-  <div className="card text-black mb-4 border-0 rounded-4 shadow-sm bg-white position-relative">
-    {/* Gear icon in top-right corner */}
-    <button
-      className="btn btn-sm btn-light rounded-circle position-absolute top-2 end-2"
-      onClick={() => setShowProfileModal(true)}
-      title="Profile Settings"
-      style={{ zIndex: 10 }}
-    >
-      <Gear size={18} />
-    </button>
+            <div className="card text-black mb-4 border-0 rounded-4 shadow-sm bg-white position-relative">
+              <div className="p-3">
+                <div className="d-flex align-items-center mb-3">
+                  <div
+                    className="rounded-circle bg-primary d-flex align-items-center justify-content-center me-2"
+                    style={{ width: '50px', height: '49px' }}
+                  >
+                    <PersonBadge size={24} color="white" />
+                  </div>
+                  <div>
+                    <p className="fw-bold mb-1 fs-6 text-truncate">
+                      {student.name}
+                    </p>
+                    <small className="text-muted d-block">ID: {student.id}</small>
+                    <small className="text-muted">RFID: {student.rfid}</small>
+                  </div>
+                </div>
 
-    <div className="p-3">
-      <div className="d-flex align-items-center mb-3">
-        <div
-          className="rounded-circle bg-primary d-flex align-items-center justify-content-center me-2"
-          style={{ width: '50px', height: '49px' }}
-        >
-          <PersonBadge size={24} color="white" />
-        </div>
-        <div>
-          <p className="fw-bold mb-1 fs-6 text-truncate">{student.name}</p>
-          <small className="text-muted d-block">ID: {student.id}</small>
-          <small className="text-muted">RFID: {student.rfid}</small>
-        </div>
-      </div>
-
-      <div className="border-top pt-3">
-        <p className="mb-0 fw-bold text-success fs-6">
-          Balance: ₱{Number(student.balance || 0).toFixed(2)}
-        </p>
-      </div>
-    </div>
-  </div>
-)}
-
+                <div className="border-top pt-3">
+                  <p className="mb-0 fw-bold text-success fs-6">
+                    Balance: ₱{Number(student.balance || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Nav Links */}
           <nav className="nav flex-column">
-            <Link href="/parent/dashboard" className={navLinkClass('/parent/dashboard')} onClick={() => setSidebarOpen(false)}>
+            <Link
+              href="/parent/dashboard"
+              className={navLinkClass('/parent/dashboard')}
+              onClick={() => setSidebarOpen(false)}
+            >
               <Speedometer2 size={20} /> <span className="ms-3">Dashboard</span>
             </Link>
-            <Link href="/parent/topup" className={navLinkClass('/parent/topup')} onClick={() => setSidebarOpen(false)}>
+            <Link
+              href="/parent/topup"
+              className={navLinkClass('/parent/topup')}
+              onClick={() => setSidebarOpen(false)}
+            >
               <CashCoin size={20} /> <span className="ms-3">Load Money</span>
             </Link>
-            <Link href="/parent/limit" className={navLinkClass('/parent/limit')} onClick={() => setSidebarOpen(false)}>
+            <Link
+              href="/parent/limit"
+              className={navLinkClass('/parent/limit')}
+              onClick={() => setSidebarOpen(false)}
+            >
               <CashCoin size={20} /> <span className="ms-3">Limit Spending</span>
             </Link>
-            <Link href="/parent/topup-history" className={navLinkClass('/parent/topup-history')} onClick={() => setSidebarOpen(false)}>
+            <Link
+              href="/parent/topup-history"
+              className={navLinkClass('/parent/topup-history')}
+              onClick={() => setSidebarOpen(false)}
+            >
               <ClockHistory size={20} /> <span className="ms-3">Load History</span>
             </Link>
-            <Link href="/parent/receipts" className={navLinkClass('/parent/receipts')} onClick={() => setSidebarOpen(false)}>
+            <Link
+              href="/parent/receipts"
+              className={navLinkClass('/parent/receipts')}
+              onClick={() => setSidebarOpen(false)}
+            >
               <Receipt size={20} /> <span className="ms-3">Receipts</span>
             </Link>
           </nav>
@@ -219,25 +359,78 @@ export default function ParentSidebarLayout({ children }: Props) {
         <div className="content-wrapper fade-in">{children}</div>
       </main>
 
-      {/* Profile Modal */}
-      {showProfileModal && (
-        <div className="profile-modal-backdrop" onClick={handleBackdropClick}>
-          <div className="profile-modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title">Profile Settings</h5>
-              <button type="button" className="btn-close" onClick={() => setShowProfileModal(false)} />
-            </div>
-            <div className="modal-body">
-              <p>Edit your profile settings here.</p>
-              {/* Add your form inputs here */}
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowProfileModal(false)}>Close</button>
-              <button className="btn btn-primary">Save Changes</button>
-            </div>
-          </div>
+      {/* Change Password Modal */}
+{showChangePasswordModal && (
+  <div
+    className="profile-modal-backdrop"
+    onClick={(e) =>
+      e.currentTarget === e.target && setShowChangePasswordModal(false)
+    }
+  >
+    <div className="profile-modal-content shadow-lg">
+      <div className="modal-header border-0 pb-2">
+        <h5 className="modal-title fw-bold">Change Password</h5>
+        <button
+          type="button"
+          className="btn-close"
+          onClick={() => setShowChangePasswordModal(false)}
+        />
+      </div>
+      <div className="modal-body">
+        <div className="mb-3">
+          <label className="form-label fw-semibold">Current Password</label>
+          <input
+            type="password"
+            className="form-control form-control-lg"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            placeholder="Enter current password"
+          />
         </div>
-      )}
+        <div className="mb-3">
+          <label className="form-label fw-semibold">New Password</label>
+          <input
+            type="password"
+            className="form-control form-control-lg"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Enter new password"
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label fw-semibold">Confirm New Password</label>
+          <input
+            type="password"
+            className="form-control form-control-lg"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm new password"
+          />
+        </div>
+      </div>
+      <div className="modal-footer border-0 pt-0 d-flex justify-content-end gap-2">
+        <button
+          className="btn btn-outline-secondary fw-semibold"
+          onClick={() => setShowChangePasswordModal(false)}
+          disabled={isSaving}
+        >
+          Cancel
+        </button>
+        <button
+          className="btn btn-primary fw-semibold"
+          onClick={handleChangePassword}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <span className="spinner-border spinner-border-sm me-2" role="status" />
+          ) : null}
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* Styles */}
       <style jsx>{`
@@ -259,6 +452,9 @@ export default function ParentSidebarLayout({ children }: Props) {
         }
         .mobile-topbar {
           z-index: 1100;
+        }
+        .dropdown-menu {
+          min-width: 160px;
         }
         .overlay {
           position: fixed;
@@ -293,28 +489,58 @@ export default function ParentSidebarLayout({ children }: Props) {
           animation: fadeIn 0.3s ease-in-out forwards;
         }
         @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
         }
 
-        /* Profile modal styles */
+        /* Modal */
         .profile-modal-backdrop {
           position: fixed;
           inset: 0;
-          background-color: rgba(0,0,0,0.5);
+          background-color: rgba(0, 0, 0, 0.5);
           display: flex;
           justify-content: center;
           align-items: center;
           z-index: 1500;
         }
         .profile-modal-content {
-          background: #fff;
-          padding: 2rem;
-          border-radius: 1rem;
-          width: 100%;
-          max-width: 500px;
-          box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-        }
+  background: #fff;
+  padding: 2.5rem 2rem;
+  border-radius: 1.25rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+  .profile-modal-content input:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  outline: none;
+}
+
+.modal-footer .btn {
+  min-width: 110px;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+}
+
+.modal-footer .btn-primary {
+  background: linear-gradient(90deg, #0062ff, #0052cc);
+  border: none;
+}
+
+.modal-footer .btn-primary:hover {
+  background: linear-gradient(90deg, #0052cc, #003f99);
+}
+
+.modal-header .modal-title {
+  font-size: 1.25rem;
+  color: #212529;
+}
 
         @media (max-width: 767px) {
           .main-content {

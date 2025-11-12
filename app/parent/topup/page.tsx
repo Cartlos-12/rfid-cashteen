@@ -1,4 +1,5 @@
 'use client';
+
 import { useEffect, useState, useRef } from 'react';
 
 export default function TopUpPage() {
@@ -46,19 +47,23 @@ export default function TopUpPage() {
       .catch(() => setOtpError('⚠️ Error fetching RFID info.'));
   }, []);
 
-  // OTP countdown
+  // ✅ OTP Countdown — fixed dependency array
   useEffect(() => {
     if (showOtpModal && isOtpSent && otpCountdown > 0) {
       if (countdownInterval.current === null) {
         countdownInterval.current = window.setInterval(() => {
-          setOtpCountdown((prev) => prev - 1);
+          setOtpCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(countdownInterval.current!);
+              countdownInterval.current = null;
+              setCanResend(true);
+              setOtpError('⏰ OTP expired. Please resend.');
+              return 0;
+            }
+            return prev - 1;
+          });
         }, 1000);
       }
-    } else if (otpCountdown <= 0 && countdownInterval.current !== null) {
-      clearInterval(countdownInterval.current);
-      countdownInterval.current = null;
-      setCanResend(true);
-      setOtpError('⏰ OTP expired. Please resend.');
     }
 
     return () => {
@@ -67,7 +72,7 @@ export default function TopUpPage() {
         countdownInterval.current = null;
       }
     };
-  }, [showOtpModal, isOtpSent, otpCountdown]);
+  }, [showOtpModal, isOtpSent, otpCountdown]); // ← added otpCountdown
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -75,40 +80,56 @@ export default function TopUpPage() {
     return `${m}:${s}`;
   };
 
+  // Send / Resend OTP
   const handleSendOtp = async () => {
-  if (!student?.rfid || !amount) {
-    setOtpError('⚠️ Please fill in all required fields.');
-    return;
-  }
-
-  setIsLoading(true);
-  setOtpError('');
-
-  try {
-    const res = await fetch('/parent/api/send-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    const data = await res.json();
-
-    if (res.ok && data.success) {
-      setIsOtpSent(true);           // make sure this is true even on resend
-      setShowOtpModal(true);
-      setOtpCountdown(300);         // reset countdown
-      setCanResend(false);          // disable resend until countdown ends
-      setOtpError('OTP sent to your email.');
-      setTimeout(() => otpRefs.current[0]?.focus(), 100);
-    } else {
-      setOtpError(`❌ ${data.message || 'Failed to send OTP.'}`);
+    if (!student?.rfid || !amount) {
+      setOtpError('⚠️ Please fill in all required fields.');
+      return;
     }
-  } catch {
-    setOtpError('⚠️ Something went wrong sending OTP.');
-  } finally {
-    setIsLoading(false);
-  }
-};
 
+    setIsLoading(true);
+    setOtpError('');
+
+    try {
+      const res = await fetch('/parent/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setIsOtpSent(true);
+        setShowOtpModal(true);
+        setOtpCountdown(300);
+        setCanResend(false);
+        setOtpError('OTP sent to your email.');
+        if (countdownInterval.current !== null) {
+          clearInterval(countdownInterval.current);
+          countdownInterval.current = null;
+        }
+        countdownInterval.current = window.setInterval(() => {
+          setOtpCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(countdownInterval.current!);
+              countdownInterval.current = null;
+              setCanResend(true);
+              setOtpError('OTP expired. Please resend.');
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        setTimeout(() => otpRefs.current[0]?.focus(), 100);
+      } else {
+        setOtpError(`❌ ${data.message || 'Failed to send OTP.'}`);
+      }
+    } catch {
+      setOtpError('⚠️ Something went wrong sending OTP.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
@@ -123,17 +144,25 @@ export default function TopUpPage() {
     e?.preventDefault();
     if (!student) return setOtpError('⚠️ RFID not found.');
     if (otp.some((d) => !d)) return setOtpError('⚠️ Please complete the OTP.');
+
     const otpValue = otp.join('');
     setIsLoading(true);
     setOtpError('');
+
     try {
       const res = await fetch('/parent/api/topup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rfid: student.rfid, amount: Number(amount), wallet, otp: otpValue }),
+        body: JSON.stringify({
+          rfid: student.rfid,
+          amount: Number(amount),
+          wallet,
+          otp: otpValue,
+        }),
         credentials: 'include',
       });
       const data = await res.json();
+
       if (res.ok && data.success) {
         setAmount('');
         setWallet('Gcash');
@@ -145,7 +174,7 @@ export default function TopUpPage() {
           countdownInterval.current = null;
         }
       } else {
-        setOtpError(` ${data.message || 'OTP is invalid or expired.'}`);
+        setOtpError(`${data.message || 'OTP is invalid or expired.'}`);
       }
     } catch {
       setOtpError('⚠️ Server error during top-up.');
@@ -157,12 +186,14 @@ export default function TopUpPage() {
   return (
     <>
       <div className={`fade-in-content ${showContent ? 'fade-in' : ''}`}>
-        <div className="container-fluid px-3 position-relative" style={{ minHeight: "70vh" }}>
+        <div className="container-fluid px-3 position-relative" style={{ minHeight: '70vh' }}>
           {/* Main Form */}
           <div className="topup-card card shadow-lg mx-auto mt-5">
             <div className="card-body p-5">
               <h3 className="text-center text-dark fw-bold mb-3">Load RFID Balance</h3>
-              <p className="text-center text-muted mb-4">Confirm your details before proceeding.</p>
+              <p className="text-center text-muted mb-4">
+                Confirm your details before proceeding.
+              </p>
 
               <div className="mb-3">
                 <label className="form-label fw-semibold">RFID Tag</label>
@@ -189,7 +220,11 @@ export default function TopUpPage() {
 
               <div className="mb-4">
                 <label className="form-label fw-semibold">E-Wallet</label>
-                <select className="form-select" value={wallet} onChange={(e) => setWallet(e.target.value)}>
+                <select
+                  className="form-select"
+                  value={wallet}
+                  onChange={(e) => setWallet(e.target.value)}
+                >
                   <option value="Gcash">Gcash</option>
                 </select>
               </div>
@@ -201,7 +236,7 @@ export default function TopUpPage() {
                 onClick={handleSendOtp}
                 disabled={isLoading || !student?.rfid || !amount}
               >
-                {isLoading ? "Processing..." : "Confirm"}
+                {isLoading ? 'Processing...' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -215,9 +250,18 @@ export default function TopUpPage() {
             <div className="modal-card animate-fade-in">
               <h5 className="text-center mb-2 fw-bold">Enter OTP</h5>
               <p className="text-center text-muted mb-2">6-digit OTP sent to your email</p>
-              <p className="text-center text-secondary mb-3">
-                {otpCountdown > 0 ? `OTP expires in ${formatTime(otpCountdown)}` : 'OTP expired'}
+              <p
+                className={`text-center mb-3 ${
+                  otpCountdown <= 60 && otpCountdown > 0
+                    ? 'text-danger fw-bold'
+                    : 'text-secondary'
+                }`}
+              >
+                {otpCountdown > 0
+                  ? `OTP expires in ${formatTime(otpCountdown)}`
+                  : 'OTP expired'}
               </p>
+
               {otpError && <p className="text-center text-danger mb-3">{otpError}</p>}
 
               <div className="otp-container mb-3">
@@ -237,10 +281,17 @@ export default function TopUpPage() {
               <button className="btn btn-primary w-100 mb-2 py-2 fw-bold" onClick={handleTopup}>
                 Proceed
               </button>
-              <button className="btn btn-outline-secondary w-100 mb-2 py-2" onClick={() => setShowOtpModal(false)}>
+              <button
+                className="btn btn-outline-secondary w-100 mb-2 py-2"
+                onClick={() => setShowOtpModal(false)}
+              >
                 Cancel
               </button>
-              <button className="btn btn-link w-100 py-1" onClick={handleSendOtp} disabled={!canResend}>
+              <button
+                className="btn btn-link w-100 py-1"
+                onClick={handleSendOtp}
+                disabled={!canResend}
+              >
                 Resend OTP
               </button>
             </div>
@@ -268,8 +319,10 @@ export default function TopUpPage() {
         </div>
       )}
 
+      {/* Styles */}
       <style jsx global>{`
-        html, body {
+        html,
+        body {
           margin: 0;
           padding: 0;
           height: 100%;
@@ -315,6 +368,7 @@ export default function TopUpPage() {
           max-height: 90%;
           overflow-y: auto;
           box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+          margin-left: 278px;
         }
 
         .animate-fade-in {
@@ -322,8 +376,14 @@ export default function TopUpPage() {
         }
 
         @keyframes modalIn {
-          0% { opacity: 0; transform: scale(0.95); }
-          100% { opacity: 1; transform: scale(1); }
+          0% {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
         }
 
         .otp-container {
@@ -341,7 +401,7 @@ export default function TopUpPage() {
 
         .topup-card {
           max-width: 480px;
-          width: 100%;
+          width: 105%;
           border-radius: 1rem;
           background: linear-gradient(135deg, #ffffff, #f9fafb);
           box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);

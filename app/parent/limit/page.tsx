@@ -144,8 +144,8 @@ export default function SpendingLimitPage() {
                         {limit > 0 ? `Limit: ₱${limit.toFixed(2)}` : 'Limit not set'}
                       </div>
                       {limit > 0 && (
-                        <div className="text-info fw-semibold">
-                          Spent today: ₱{spentToday.toFixed(2)} | Remaining: ₱{remainingLimit.toFixed(2)}
+                        <div className="text-secondary fw-semibold">
+                          Spent today: ₱{spentToday.toFixed(2)}  <br /> Remaining: ₱{remainingLimit.toFixed(2)}
                         </div>
                       )}
                     </div>
@@ -227,12 +227,13 @@ export default function SpendingLimitPage() {
         }
 
         .limit-card {
-          max-width: 490px;
+          max-width: 480px;
           width: 105%;
           border-radius: 1rem;
           background: linear-gradient(135deg, #ffffff, #f9fafb);
           box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
           transition: transform 0.25s ease, box-shadow 0.25s ease;
+          margin-left: 20px;
         }
         .limit-card:hover {
           transform: translateY(-3px);
@@ -261,7 +262,7 @@ export default function SpendingLimitPage() {
         }
 
         .modern-btn {
-          background: linear-gradient(135deg, #007bff, #0056b3);
+          background: linear-gradient(135deg, #007bff);
           border: none;
           border-radius: 0.75rem;
           box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
@@ -269,11 +270,6 @@ export default function SpendingLimitPage() {
           font-weight: 600;
           transition: all 0.3s ease;
           padding: 0.75rem 1.5rem;
-        }
-        .modern-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(0, 123, 255, 0.4);
-          background: linear-gradient(135deg, #0056b3, #007bff);
         }
         .modern-btn:disabled {
           opacity: 0.6;
