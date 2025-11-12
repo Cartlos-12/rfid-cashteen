@@ -106,19 +106,10 @@ export default function DashboardPage() {
     return { totalTransactions, totalSpentThisWeek };
   }, [transactions, weeklyData]);
 
-  if (loading || checkingSession) {
-    return (
-      <div className="loading-wrapper d-flex justify-content-center align-items-center vh-100">
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
+  // Removed loading overlay, now content fades in smoothly
   return (
     <>
-      <div className="dashboard-container">
+      <div className={`dashboard-container ${!loading && !checkingSession ? 'fade-in' : ''}`}>
         <div className="header mb-4">
           <h2 className="fw-bold text-primary-color mb-2">Dashboard Overview</h2>
           <p className="text-muted mb-0">Monitor your spending and transaction insights</p>
@@ -173,7 +164,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Purchases (Modernized) */}
+        {/* Recent Purchases */}
         <div className="recent-purchases">
           <h5 className="fw-semibold text-primary-color mb-3">Recent Purchases</h5>
           {transactions.length === 0 ? (
@@ -216,14 +207,19 @@ export default function DashboardPage() {
           max-width: 1100px;
           margin: 0 auto;
           padding: 1rem;
+          opacity: 0;
+          transform: translateY(20px);
+          transition: opacity 0.8s ease, transform 0.8s ease;
         }
-
+        .dashboard-container.fade-in {
+          opacity: 1;
+          transform: translateY(0);
+        }
         .summary-metrics {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
           gap: 1.2rem;
         }
-
         .metric-card {
           background: linear-gradient(135deg, #ffffff, #f8fafc);
           border-radius: 16px;
@@ -234,25 +230,21 @@ export default function DashboardPage() {
           box-shadow: 0 6px 16px rgba(0,0,0,0.06);
           transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
-
         .metric-card:hover {
           transform: translateY(-4px);
           box-shadow: 0 8px 20px rgba(0,0,0,0.08);
         }
-
         .metric-text h6 {
           font-size: 0.9rem;
           color: #666;
           margin: 0;
         }
-
         .metric-text h3 {
           font-size: 1.8rem;
           font-weight: 700;
           color: #222;
           margin: 0;
         }
-
         .icon-wrapper {
           width: 54px;
           height: 54px;
@@ -262,26 +254,15 @@ export default function DashboardPage() {
           border-radius: 12px;
           color: #fff;
         }
-
-        .blue {
-          background: linear-gradient(135deg, #3b82f6, #60a5fa);
-        }
-        .green {
-          background: linear-gradient(135deg, #22c55e, #4ade80);
-        }
-
+        .blue { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
+        .green { background: linear-gradient(135deg, #22c55e, #4ade80); }
         .chart-card {
           background: #fff;
           border-radius: 16px;
           padding: 1.5rem;
           box-shadow: 0 6px 18px rgba(0,0,0,0.05);
         }
-
-        .chart-wrapper {
-          height: 350px;
-        }
-
-        /* Modern Table Section */
+        .chart-wrapper { height: 350px; }
         .modern-table {
           background: linear-gradient(180deg, #ffffff, #f9fafb);
           border: 1px solid #e5e7eb;
@@ -290,22 +271,11 @@ export default function DashboardPage() {
           overflow: hidden;
           transition: all 0.3s ease;
         }
-
         .modern-table:hover {
           box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
         }
-
-        .table-scroll-wrapper {
-          max-height: 380px;
-          overflow-y: auto;
-        }
-
-        .table.modern {
-          width: 100%;
-          border-collapse: separate;
-          border-spacing: 0;
-        }
-
+        .table-scroll-wrapper { max-height: 380px; overflow-y: auto; }
+        .table.modern { width: 100%; border-collapse: separate; border-spacing: 0; }
         .table.modern th {
           background: #f1f5f9;
           color: #334155;
@@ -318,21 +288,17 @@ export default function DashboardPage() {
           letter-spacing: 0.5px;
           padding: 0.9rem 1rem;
         }
-
         .table.modern tbody tr {
           transition: background 0.2s ease, transform 0.2s ease;
         }
-
         .table.modern tbody tr:hover {
           background: #f8fafc;
           transform: translateX(3px);
         }
-
         .table.modern td {
           padding: 0.85rem 1rem;
           border-top: 1px solid #f1f5f9;
         }
-
         .badge.bg-success-light {
           background: rgba(34, 197, 94, 0.1);
           color: #16a34a;
@@ -340,41 +306,23 @@ export default function DashboardPage() {
           border-radius: 8px;
           font-weight: 600;
         }
-
         .fade-in {
           animation: fadeIn 0.4s ease forwards;
         }
-
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(6px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-
         .no-transactions {
           text-align: center;
           padding: 2rem;
           color: #6b7280;
           font-style: italic;
         }
-
         @media (max-width: 768px) {
-          .dashboard-container {
-            padding: 1rem;
-          }
-
-          .metric-card {
-            padding: 16px;
-          }
-
-          .metric-text h3 {
-            font-size: 1.4rem;
-          }
+          .dashboard-container { padding: 1rem; }
+          .metric-card { padding: 16px; }
+          .metric-text h3 { font-size: 1.4rem; }
         }
       `}</style>
     </>

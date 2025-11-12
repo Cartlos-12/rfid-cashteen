@@ -12,6 +12,7 @@ import {
   BoxArrowRight,
   List,
   X,
+  Gear,
 } from 'react-bootstrap-icons';
 
 type Student = {
@@ -23,6 +24,7 @@ type Student = {
 
 interface Props {
   children: ReactNode;
+  student: Student | null;
 }
 
 export default function ParentSidebarLayout({ children }: Props) {
@@ -33,6 +35,7 @@ export default function ParentSidebarLayout({ children }: Props) {
   const [student, setStudent] = useState<Student | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +59,9 @@ export default function ParentSidebarLayout({ children }: Props) {
 
     verifySession();
 
-    const handleVisibilityChange = () => { if (document.visibilityState === 'visible') verifySession(); };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') verifySession();
+    };
     const handlePopState = () => verifySession();
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -90,11 +95,13 @@ export default function ParentSidebarLayout({ children }: Props) {
 
   const navLinkClass = (href: string) => {
     const isActive = pathname === href;
-    return `nav-link d-flex justify-content-start px-3 py-3 rounded-3 fw-semibold mb-1 ${
-      isActive ? 'bg-white text-primary shadow-sm' : 'text-white opacity-85 hover-opacity-100'
+    return `nav-link d-flex justify-content-start px-3 py-3 rounded-3 fw-semibold mb-1 <w-200px> ${
+      isActive ? 'bg-white text-primary shadow-sm' : 'text-white opacity-85 hover-opacity-100' 
     }`;
   };
-  
+
+  const handleBackdropClick = (e: React.MouseEvent) => e.currentTarget === e.target && setShowProfileModal(false);
+
   return (
     <div className="layout-wrapper d-flex">
       {/* Mobile Top Bar */}
@@ -117,6 +124,7 @@ export default function ParentSidebarLayout({ children }: Props) {
       >
         <div className="d-flex justify-content-between align-items-center p-3 border-bottom border-white-25">
           <h6 className="mb-0 fw-bold">Parent Portal</h6>
+          
           <button
             className="btn btn-sm text-white d-md-none border-0 bg-transparent"
             onClick={() => setSidebarOpen(false)}
@@ -127,29 +135,41 @@ export default function ParentSidebarLayout({ children }: Props) {
 
         <div className="p-3 flex-grow-1 overflow-auto">
           {student && (
-            <div className="card text-black mb-4 border-0 rounded-4 shadow-sm bg-white">
-              <div className="p-3">
-                <div className="d-flex align-items-center mb-3">
-                  <div
-                    className="rounded-circle bg-primary d-flex align-items-center justify-content-center me-2"
-                    style={{ width: '51px', height: '44px' }}
-                  >
-                    <PersonBadge size={24} color="white" />
-                  </div>
-                  <div>
-                    <p className="fw-bold mb-1 fs-6 text-truncate">{student.name}</p>
-                    <small className="text-muted d-block">ID: {student.id}</small>
-                    <small className="text-muted">RFID: {student.rfid}</small>
-                  </div>
-                </div>
-                <div className="border-top pt-3">
-                  <p className="mb-0 fw-bold text-success fs-6">
-                    Balance: ₱{Number(student.balance || 0).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+  <div className="card text-black mb-4 border-0 rounded-4 shadow-sm bg-white position-relative">
+    {/* Gear icon in top-right corner */}
+    <button
+      className="btn btn-sm btn-light rounded-circle position-absolute top-2 end-2"
+      onClick={() => setShowProfileModal(true)}
+      title="Profile Settings"
+      style={{ zIndex: 10 }}
+    >
+      <Gear size={18} />
+    </button>
+
+    <div className="p-3">
+      <div className="d-flex align-items-center mb-3">
+        <div
+          className="rounded-circle bg-primary d-flex align-items-center justify-content-center me-2"
+          style={{ width: '50px', height: '49px' }}
+        >
+          <PersonBadge size={24} color="white" />
+        </div>
+        <div>
+          <p className="fw-bold mb-1 fs-6 text-truncate">{student.name}</p>
+          <small className="text-muted d-block">ID: {student.id}</small>
+          <small className="text-muted">RFID: {student.rfid}</small>
+        </div>
+      </div>
+
+      <div className="border-top pt-3">
+        <p className="mb-0 fw-bold text-success fs-6">
+          Balance: ₱{Number(student.balance || 0).toFixed(2)}
+        </p>
+      </div>
+    </div>
+  </div>
+)}
+
 
           {/* Nav Links */}
           <nav className="nav flex-column">
@@ -198,6 +218,26 @@ export default function ParentSidebarLayout({ children }: Props) {
       <main className="main-content flex-grow-1 bg-light">
         <div className="content-wrapper fade-in">{children}</div>
       </main>
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <div className="profile-modal-backdrop" onClick={handleBackdropClick}>
+          <div className="profile-modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Profile Settings</h5>
+              <button type="button" className="btn-close" onClick={() => setShowProfileModal(false)} />
+            </div>
+            <div className="modal-body">
+              <p>Edit your profile settings here.</p>
+              {/* Add your form inputs here */}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowProfileModal(false)}>Close</button>
+              <button className="btn btn-primary">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Styles */}
       <style jsx>{`
@@ -256,6 +296,26 @@ export default function ParentSidebarLayout({ children }: Props) {
           from { opacity: 0; }
           to { opacity: 1; }
         }
+
+        /* Profile modal styles */
+        .profile-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background-color: rgba(0,0,0,0.5);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1500;
+        }
+        .profile-modal-content {
+          background: #fff;
+          padding: 2rem;
+          border-radius: 1rem;
+          width: 100%;
+          max-width: 500px;
+          box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+
         @media (max-width: 767px) {
           .main-content {
             padding-top: 80px;

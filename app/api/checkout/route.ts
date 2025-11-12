@@ -87,6 +87,8 @@ export async function POST(req: Request) {
       message: "Checkout successful",
       newBalance: currentBalance - total,
       spentToday: spentToday + total,
+      remainingLimit: dailyLimit > 0 ? dailyLimit - (spentToday + total) : null,
+      attemptedSpend: total,
     });
   } catch (error: any) {
     await conn.rollback();

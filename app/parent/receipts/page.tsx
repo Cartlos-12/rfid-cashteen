@@ -2,128 +2,121 @@
 
 import React, { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
-import "bootstrap-icons/font/bootstrap-icons.css"; // Added for icons
+import "bootstrap-icons/font/bootstrap-icons.css";
 
-interface CartItem { id?: number; name: string; price: number | string; quantity: number | string; }
-interface ReceiptData { id?: string; customerName: string; total: number | string; items: CartItem[]; date?: string; }
-interface Transaction { id: number; user_name: string; total: number; status: string; created_at: string; items?: CartItem[]; }
-interface Parent { id: string; name: string; email: string; }
+interface CartItem {
+  id?: number;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+interface ReceiptData {
+  id?: string;
+  customerName: string;
+  total: number;
+  items: CartItem[];
+  date?: string;
+  oldBalance?: number;
+  newBalance?: number;
+}
+
+interface Transaction {
+  id: string | number;
+  user_name: string;
+  total: number;
+  status: string;
+  created_at: string;
+  items?: CartItem[];
+}
+
+interface Parent {
+  id: string;
+  name: string;
+  email: string;
+}
 
 function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => void }) {
   const receiptId = data.id || `TX-${new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14)}`;
-  const formattedDate = data.date || new Date().toLocaleString();
-
-  useEffect(() => {
-    // Disable scrolling and navigation on background
-    document.body.classList.add("modal-open");
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed"; // Prevents any background scrolling or navigation shifts
-    document.body.style.width = "100%"; // Ensures no horizontal shift
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    const preventScroll = (e: Event) => e.preventDefault(); // Prevent wheel, touch, etc.
-    const preventNavigation = (e: Event) => e.preventDefault(); // Prevent popstate, etc.
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("wheel", preventScroll, { passive: false });
-    document.addEventListener("touchmove", preventScroll, { passive: false });
-    window.addEventListener("popstate", preventNavigation); // Prevents back/forward navigation
-
-    return () => {
-      document.body.classList.remove("modal-open");
-      document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.width = "";
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("wheel", preventScroll);
-      document.removeEventListener("touchmove", preventScroll);
-      window.removeEventListener("popstate", preventNavigation);
-    };
-  }, [onClose]);
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose(); // Close on backdrop click
-  };
-
-  const handlePrint = () => window.print();
+  const formattedDate = data.date ? new Date(data.date).toLocaleString() : new Date().toLocaleString();
 
   return (
-    <>
-      <div className="modal-backdrop fade show" onClick={handleBackdropClick}></div>
-      <div className="modal fade show d-block" tabIndex={-1} role="dialog" aria-labelledby="receiptModalLabel" aria-hidden="true">
-        <div className="modal-dialog modal-dialog-centered modal-responsive" role="document">
-          <div className="modal-content p-3 p-md-4 rounded-3 shadow-lg receipt-paper">
-            <div className="text-center mb-3 mb-md-4">
-              <h5 id="receiptModalLabel" className="fw-bold mt-2 text-primary">Cashteen Invoice</h5>
-              <small className="text-muted d-block">479 Magsaysay Avenue 4700, Sorsogon</small>
-              <small className="text-muted mt-1 d-block">Thank you for your purchase!</small>
+    <div className="modal d-block position-fixed top-0 start-0 w-100 h-100" style={{ zIndex: 1050 }}>
+      {/* Overlay */}
+      <div
+        className="position-absolute top-0 start-0 w-100 h-100"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }}
+        onClick={onClose}
+      />
+
+      {/* Modal content */}
+      <div className="modal-dialog modal-dialog-centered position-relative">
+        <div className="modal-content p-3" style={{ fontFamily: 'monospace', maxHeight: '90vh', overflowY: 'auto', width: '400px', margin: 'auto', borderRadius: '8px' }}>
+          
+          {/* Header */}
+          <div className="modal-header justify-content-center position-relative">
+            <h5 className="modal-title fw-bold">Invoice</h5>
+            <button type="button" className="btn-close position-absolute" style={{ right: '1rem' }} onClick={onClose}></button>
+          </div>
+
+          {/* Body */}
+          <div className="modal-body">
+            <div className="text-center mb-3">
+              <h6 className="fw-bold mb-0">Cashteen Payment System</h6>
+              <small>Invoice</small>
             </div>
 
-            <div className="border-top border-bottom py-2 py-md-3 my-3 bg-light rounded">
-              <p className="mb-1 mb-md-2"><strong>Receipt ID:</strong> {receiptId}</p>
-              <p className="mb-1 mb-md-2"><strong>Customer Name:</strong> {data.customerName}</p>
-              <p className="mb-0"><strong>Date:</strong> {formattedDate}</p>
+            <div className="mb-2">
+              <p className="mb-1"><strong>Receipt ID:</strong> {receiptId}</p>
+              <p className="mb-1"><strong>Customer:</strong> {data.customerName}</p>
+              <p className="mb-1"><strong>Date:</strong> {formattedDate}</p>
+              {data.oldBalance !== undefined && data.newBalance !== undefined && (
+                <>
+                  <p className="mb-1"><strong>Old Balance:</strong> ₱{data.oldBalance.toFixed(2)}</p>
+                  <p className="mb-1"><strong>New Balance:</strong> ₱{data.newBalance.toFixed(2)}</p>
+                </>
+              )}
             </div>
 
-            <div className="table-responsive" style={{ maxHeight: "250px", overflowY: "auto" }}>
-              <table className="table table-borderless table-sm mb-0">
-                <thead className="table-light sticky-top">
-                  <tr>
-                    <th>Item</th>
-                    <th className="text-center">Qty</th>
-                    <th className="text-end">Price</th>
-                    <th className="text-end">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.items.length ? (
-                    data.items.map((item, index) => {
-                      const price = Number(item.price) || 0;
-                      const quantity = Number(item.quantity) || 0;
-                      const total = price * quantity;
-                      return (
-                        <tr key={`${item.id ?? index}-${item.name}`}>
-                          <td>{item.name}</td>
-                          <td className="text-center">{quantity}</td>
-                          <td className="text-end">₱{price.toFixed(2)}</td>
-                          <td className="text-end">₱{total.toFixed(2)}</td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="text-center text-muted">No items found</td>
-                    </tr>
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <th colSpan={3} className="text-end border-top border-dark pt-2 pt-md-3 fw-bold">TOTAL</th>
-                    <th className="text-end border-top border-dark pt-2 pt-md-3 fw-bold">₱{Number(data.total).toFixed(2)}</th>
-                  </tr>
-                </tfoot>
-              </table>
+            <hr />
+
+            <div>
+              {data.items.length > 0 ? (
+                data.items.map((i, idx) => (
+                  <div key={idx} className="d-flex justify-content-between mb-1">
+                    <span>{i.name} x{i.quantity}</span>
+                    <span>₱{(i.price * i.quantity).toFixed(2)}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-muted">No items listed</p>
+              )}
             </div>
 
-            <div className="text-center mt-3 mt-md-4">
-              <small className="text-muted d-block">--- This serves as your Invoice ---</small>
-              <small className="text-muted">Please visit again! 😊</small>
+            <hr />
+
+            <div className="d-flex justify-content-between fw-bold">
+              <span>Total</span>
+              <span>₱{data.total.toFixed(2)}</span>
             </div>
 
-            <div className="modal-footer d-flex gap-2 mt-3 mt-md-4 border-0">
-              <button type="button" className="btn btn-outline-secondary flex-fill" onClick={onClose}>
-                <i className="bi bi-x-circle me-1"></i>Close
-              </button>
-              <button type="button" className="btn btn-success flex-fill" onClick={handlePrint}>
-                <i className="bi bi-printer me-1"></i>Print
-              </button>
+            <div className="text-center mt-3">
+              <small>Thank you for your purchase!</small>
             </div>
+          </div>
+
+          {/* Footer */}
+          <div className="modal-footer">
+            <button
+              className="btn btn-success w-100"
+              onClick={() => window.print()}
+            >
+              Print
+            </button>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -131,7 +124,7 @@ export default function ReceiptsPage() {
   const [parent, setParent] = useState<Parent | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [animateContent, setAnimateContent] = useState(false);
 
   useEffect(() => {
     async function fetchParent() {
@@ -143,8 +136,6 @@ export default function ReceiptsPage() {
       } catch (err: any) {
         console.error("No logged-in parent:", err.message);
         setParent(null);
-      } finally {
-        setLoading(false);
       }
     }
     fetchParent();
@@ -152,26 +143,26 @@ export default function ReceiptsPage() {
 
   useEffect(() => {
     if (!parent?.id) return;
+
     async function fetchTransactions() {
-      setLoading(true);
       try {
         const res = await fetch("/parent/api/receipts?page=1", { credentials: "include" });
         if (!res.ok) throw new Error("Failed to fetch transactions");
         const data: Transaction[] = await res.json();
-        setTransactions(
-          data.map((tx) => ({
-            ...tx,
-            total: Number(tx.total) || 0,
-            items: Array.isArray(tx.items) ? tx.items : [],
-          }))
-        );
+
+        setTransactions(data.map(tx => ({
+          ...tx,
+          total: Number(tx.total) || 0,
+          items: Array.isArray(tx.items) ? tx.items : [],
+        })));
+        setAnimateContent(true);
       } catch (err) {
         console.error(err);
         setTransactions([]);
-      } finally {
-        setLoading(false);
+        setAnimateContent(true);
       }
     }
+
     fetchTransactions();
   }, [parent]);
 
@@ -186,169 +177,75 @@ export default function ReceiptsPage() {
   };
 
   return (
-    <div className="container py-4">
-      <h3 className="fw-bold mb-4 text-dark">Invoice Purchase</h3>
+    <div className="container-fluid px-3 position-relative" style={{ minHeight: "70vh" }}>
+      <div className={`transition-container ${animateContent ? "fade-in-container" : ""}`}>
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3 px-2">
+          <h3 className="text-dark fw-bold mb-3">Invoice Purchase</h3>
+        </div>
 
-      {/* Desktop Table */}
-      <div className="d-none d-md-block">
-        <div className="table-responsive shadow-sm border rounded" style={{ maxHeight: "500px", overflowY: "auto" }}>
-          <table className="table table-hover table-striped align-middle mb-0">
-            <thead className="table-primary sticky-top shadow-sm">
-              <tr>
-                <th>Customer</th>
-                <th>Date</th>
-                <th className="text-end">Total</th>
-                <th className="text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="align-middle">
-                    <td><div className="skeleton skeleton-text"></div></td>
-                    <td><div className="skeleton skeleton-text-sm"></div></td>
-                    <td className="text-end"><div className="skeleton skeleton-text-xs"></div></td>
-                    <td className="text-center"><div className="skeleton skeleton-btn mx-auto"></div></td>
-                  </tr>
-                ))
-              ) : transactions.length ? (
-                transactions.slice(0, 10).map((tx) => (
-                  <tr key={tx.id} className="align-middle">
-                    <td>{tx.user_name}</td>
-                    <td>{new Date(tx.created_at).toLocaleString()}</td>
-                    <td className="text-end">₱{Number(tx.total).toFixed(2)}</td>
-                    <td className="text-center">
-                      <button className="btn btn-sm btn-primary px-3 py-1" onClick={() => openReceipt(tx)}>
-                        View
-                      </button>
+        {/* Transactions Table */}
+        <div className="shadow-sm border rounded table-container" style={{ maxHeight: '580px', overflowY: 'auto', backgroundColor: '#fff' }}>
+          <div className="d-none d-sm-block table-responsive">
+            <table className="table table-hover mb-0 align-middle" style={{ tableLayout: 'fixed', minWidth: '600px', width: '100%' }}>
+              <thead className="table-header sticky-top shadow-sm">
+                <tr className="text-center">
+                  <th className="py-3">Customer</th>
+                  <th className="py-3">Date</th>
+                  <th className="py-3">Total</th>
+                  <th className="py-3">Action</th>
+                </tr>
+              </thead>
+              <tbody className="text-center">
+                {transactions.length ? transactions.map((tx, index) => (
+                  <tr key={tx.id} className="align-middle fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
+                    <td className="fw-semibold">{tx.user_name}</td>
+                    <td>{new Date(tx.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</td>
+                    <td className="text-success fw-semibold">₱{tx.total.toFixed(2)}</td>
+                    <td>
+                      <button className="btn btn-sm btn-primary px-3 py-1" onClick={() => openReceipt(tx)}>View</button>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} className="text-center py-5 text-muted">No transactions found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )) : (
+                  <tr>
+                    <td colSpan={4} className="py-5 text-muted">No transactions found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="d-block d-sm-none px-2">
+          {transactions.length ? transactions.map((tx, i) => (
+            <div key={tx.id} className="mobile-card border rounded shadow-sm mb-3 p-3 fade-in" style={{ backgroundColor: i % 2 === 0 ? '#f8f9fa' : '#ffffff', animationDelay: `${i * 0.05}s` }}>
+              <div className="d-flex justify-content-between mb-1"><span className="fw-semibold">Customer:</span><span>{tx.user_name}</span></div>
+              <div className="d-flex justify-content-between mb-1"><span className="fw-semibold">Date:</span><span>{new Date(tx.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</span></div>
+              <div className="d-flex justify-content-between mb-1"><span className="fw-semibold">Total:</span><span className="text-success fw-semibold">₱{tx.total.toFixed(2)}</span></div>
+              <button className="btn btn-primary w-100 mt-2" onClick={() => openReceipt(tx)}>View Receipt</button>
+            </div>
+          )) : <div className="text-center py-5 text-muted">No transactions found</div>}
         </div>
       </div>
 
-      {/* Mobile Card Layout */}
-      <div className="d-md-none">
-        {loading ? (
-          Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="card mb-3 shadow-sm">
-              <div className="card-body">
-                <div className="skeleton skeleton-title mb-2"></div>
-                <div className="skeleton skeleton-text-sm mb-1"></div>
-                <div className="skeleton skeleton-text-xs mb-3"></div>
-                <div className="skeleton skeleton-btn"></div>
-              </div>
-            </div>
-          ))
-        ) : transactions.length ? (
-          transactions.slice(0, 10).map((tx) => (
-            <div key={tx.id} className="card mb-3 shadow-sm">
-              <div className="card-body">
-                <h6 className="card-title text-dark">{tx.user_name}</h6>
-                <p className="card-text mb-1"><strong>Date:</strong> {new Date(tx.created_at).toLocaleString()}</p>
-                <p className="card-text mb-3"><strong>Total:</strong> ₱{Number(tx.total).toFixed(2)}</p>
-                <button className="btn btn-primary w-100" onClick={() => openReceipt(tx)}>
-                  View Receipt
-                </button>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="text-center py-5 text-muted">No transactions found.</div>
-        )}
-      </div>
-
-      {selectedReceipt && (
-        <ReceiptModal data={selectedReceipt} onClose={() => setSelectedReceipt(null)} />
-      )}
+      {/* Receipt Modal */}
+      {selectedReceipt && <ReceiptModal data={selectedReceipt} onClose={() => setSelectedReceipt(null)} />}
 
       <style jsx>{`
-        :global(body) {
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        :global(.table-striped tbody tr:nth-of-type(odd)) {
-          background-color: rgba(0, 123, 255, 0.05);
-        }
-        :global(.table-hover tbody tr:hover) {
-          background-color: rgba(0, 123, 255, 0.1);
-          transition: background-color 0.2s;
-        }
-        :global(.table th, .table td) {
-          vertical-align: middle;
-          padding: 0.75rem;
-        }
-        :global(.receipt-paper) {
-          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-          border: 1px solid #dee2e6;
-        }
-        :global(.skeleton) {
-          background-color: #e0e0e0;
-          border-radius: 4px;
-          animation: pulse 1.2s infinite ease-in-out;
-        }
-        :global(.skeleton-text) {
-          height: 1.2rem;
-          width: 75%;
-        }
-        :global(.skeleton-text-sm) {
-          height: 1rem;
-          width: 50%;
-        }
-        :global(.skeleton-text-xs) {
-          height: 0.9rem;
-          width: 25%;
-        }
-        :global(.skeleton-title) {
-          height: 1.5rem;
-          width: 75%;
-        }
-        :global(.skeleton-btn) {
-          height: 2rem;
-          width: 50%;
-        }
-        :global(.modal-responsive) {
-          max-width: 90vw; /* Responsive width */
-        }
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.4; }
-          100% { opacity: 1; }
-        }
-        @media (min-width: 768px) {
-          :global(.modal-responsive) {
-            max-width: 450px; /* Even smaller on desktop for a more compact receipt */
-          }
-        }
-        @media (max-width: 767.98px) {
-          :global(.modal-dialog) {
-            margin: 0.5rem auto; /* Center horizontally on mobile */
-            width: 95vw; /* Full width on mobile */
-          }
-          :global(.modal-content) {
-            padding: 1rem; /* Reduce padding on small screens */
-          }
-          :global(.btn) {
-            font-size: 0.9rem;
-          }
-          :global(.card) {
-            border-radius: 0.5rem;
-          }
-        }
-        @media print {
-          :global(.modal-backdrop, .modal-footer) {
-            display: none !important;
-          }
-          :global(.modal-content) {
-            box-shadow: none !important;
-            border: none !important;
-          }
+        .table-header th { background-color: #cfe2ff; font-weight: 600; color: #0d6efd; }
+        table tbody tr:hover { background-color: #d0e4ff; transition: background-color 0.3s; }
+        .mobile-card { transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease; }
+        .mobile-card:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.1); }
+
+        .fade-in { opacity: 0; animation: fadeIn 0.5s forwards; }
+        @keyframes fadeIn { to { opacity: 1; } }
+
+        .transition-container { opacity: 0; transition: opacity 0.5s ease; }
+        .fade-in-container { opacity: 1; }
+
+        @media (max-width: 576px) {
+          .table-container { margin-left: 0 !important; margin-right: 0 !important; }
+          table thead th, table tbody td { font-size: 0.85rem; padding: 0.5rem; }
         }
       `}</style>
     </div>

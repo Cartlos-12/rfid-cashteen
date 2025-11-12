@@ -6,11 +6,8 @@ const JWT_SECRET = process.env.JWT_SECRET || "my_super_secret_key";
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get("parentToken")?.value;
-  if (!token) {
-    return NextResponse.json({ success: false, message: "Not authenticated" }, { status: 401 });
-  }
+  if (!token) return NextResponse.json({ success: false, message: "Not authenticated" }, { status: 401 });
 
-  // Verify JWT
   let decoded: any;
   try {
     decoded = jwt.verify(token, JWT_SECRET);
@@ -19,41 +16,45 @@ export async function GET(req: NextRequest) {
   }
 
   const parentId = decoded.studentId || decoded.id;
-  if (!parentId) {
-    return NextResponse.json({ success: false, message: "Invalid parent ID" }, { status: 400 });
-  }
+  if (!parentId) return NextResponse.json({ success: false, message: "Invalid parent ID" }, { status: 400 });
 
   const conn = await pool.getConnection();
   try {
-    // Fetch all transactions for this parent
-    const [transactions] = await conn.query(
-      "SELECT t.id, t.total, t.status, t.created_at, u.name as user_name FROM transactions t INNER JOIN parents u ON t.user_id = u.id WHERE t.user_id = ? ORDER BY t.created_at DESC",
+    const [rows] = await conn.query(
+      `SELECT id, user_id, user_name, item_id, item_name, quantity, price, total, status, created_at
+       FROM transactions
+       WHERE user_id = ?
+       ORDER BY created_at DESC`,
       [parentId]
     );
 
-    const transactionArray = transactions as any[];
+    const transactionRows = rows as any[];
 
-    if (transactionArray.length === 0) {
-      return NextResponse.json([]); // No transactions
-    }
+    // Group rows by transaction id
+    const transactionsMap: Record<string, any> = {};
+    transactionRows.forEach(row => {
+      if (!transactionsMap[row.id]) {
+        transactionsMap[row.id] = {
+          id: row.id,
+          user_name: row.user_name,
+          total: 0,
+          status: row.status,
+          created_at: row.created_at,
+          items: []
+        };
+      }
 
-    // Fetch all items for these transactions
-    const [items] = await conn.query(
-      `SELECT id, item_name as name, price, quantity 
-       FROM transactions 
-       WHERE id IN (${transactionArray.map(() => "?").join(",")})`,
-      transactionArray.map(tx => tx.id)
-    );
+      transactionsMap[row.id].items.push({
+        id: row.item_id,
+        name: row.item_name,
+        price: Number(row.price) || 0,
+        quantity: Number(row.quantity) || 0
+      });
 
-    const itemsArray = items as any[];
+      transactionsMap[row.id].total += Number(row.total) || 0;
+    });
 
-    // Map items to transactions
-    const txWithItems = transactionArray.map(tx => ({
-      ...tx,
-      items: itemsArray.filter(i => i.transaction_id === tx.id)
-    }));
-
-    return NextResponse.json(txWithItems);
+    return NextResponse.json(Object.values(transactionsMap));
 
   } finally {
     conn.release();
