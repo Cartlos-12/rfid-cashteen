@@ -18,38 +18,41 @@ export default function SpendingLimitPage() {
   const [newLimit, setNewLimit] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true); // <-- new loading state
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setShowContent(true);
   }, []);
 
-  // Fetch student from JWT cookie
-  useEffect(() => {
-    async function fetchStudent() {
-      try {
-        const res = await fetch('/parent/api/student', { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch student');
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message);
+  // Reusable fetch function to refresh student data
+  async function fetchStudent() {
+    try {
+      const res = await fetch('/parent/api/student', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch student');
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
 
-        setStudent({
-          id: data.student.id,
-          name: data.student.name,
-          balance: Number(data.student.balance || 0),
-          daily_limit: Number(data.student.daily_limit || 0),
-          spent_today: Number(data.student.spent_today || 0),
-        });
-      } catch (err) {
-        console.error(err);
-        setMessage('❌ Failed to load student data.');
-      } finally {
-        setLoading(false); // <-- stop loading after fetch
-      }
+      setStudent({
+        id: data.student.id,
+        name: data.student.name,
+        balance: Number(data.student.balance || 0),
+        daily_limit: Number(data.student.daily_limit || 0),
+        spent_today: Number(data.student.spent_today || 0),
+      });
+    } catch (err) {
+      console.error(err);
+      setMessage('❌ Failed to load student data.');
+    } finally {
+      setLoading(false);
     }
+  }
+
+  // Initial load
+  useEffect(() => {
     fetchStudent();
   }, []);
 
+  // Set new daily limit
   const handleSetLimit = async () => {
     if (!student) return;
 
@@ -66,37 +69,48 @@ export default function SpendingLimitPage() {
     try {
       setSaving(true);
 
-      // Update daily limit
       const res = await fetch('/parent/api/limit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ student_id: student.id, daily_limit: limitValue }),
       });
+
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
 
       // Refresh student data immediately
-      const updatedRes = await fetch('/parent/api/student', { credentials: 'include' });
-      const updatedData = await updatedRes.json();
-      if (!updatedData.success) throw new Error(updatedData.message);
-
-      setStudent({
-        ...student,
-        daily_limit: limitValue,
-        spent_today: Number(updatedData.student.spent_today || 0),
-        balance: Number(updatedData.student.balance || 0),
-      });
+      await fetchStudent();
 
       setMessage('✅ Daily spending limit set successfully!');
       setNewLimit('');
     } catch (err) {
       console.error(err);
-      setMessage(`❌ ${err instanceof Error ? err.message : 'Error saving daily limit.'}`);
+      setMessage(`${err instanceof Error ? err.message : 'Error saving daily limit.'}`);
     } finally {
       setSaving(false);
     }
   };
+
+  // Call this after any purchase to refresh student info automatically
+  async function handlePurchase(purchaseData: any) {
+    try {
+      const res = await fetch('/parent/api/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(purchaseData),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+
+      // Refresh student data immediately
+      await fetchStudent();
+    } catch (err) {
+      console.error(err);
+      setMessage(`❌ ${err instanceof Error ? err.message : 'Error processing purchase.'}`);
+    }
+  }
 
   const balance = student?.balance ?? 0;
   const limit = student?.daily_limit ?? 0;
@@ -262,7 +276,7 @@ export default function SpendingLimitPage() {
         }
 
         .modern-btn {
-          background: linear-gradient(135deg, #007bff);
+          background: #007bff;
           border: none;
           border-radius: 0.75rem;
           box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
