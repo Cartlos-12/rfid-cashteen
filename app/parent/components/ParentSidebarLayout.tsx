@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState, useCallback } from 'react';
+import SessionExpiredModal from "../components/SessionExpiredModal";
 import {
   PersonBadge,
   CashCoin,
@@ -27,6 +28,11 @@ interface Props {
   children: ReactNode;
 }
 
+interface SessionExpiredModalProps {
+  onConfirm: () => void;
+}
+
+ 
 export default function ParentSidebarLayout({ children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -83,6 +89,8 @@ export default function ParentSidebarLayout({ children }: Props) {
       setCheckingSession(false);
     }
   }, []);
+  
+
 
   useEffect(() => {
     // Initial session check
@@ -180,6 +188,8 @@ export default function ParentSidebarLayout({ children }: Props) {
       </div>
     );
   }
+
+  
 
   return (
     <div className="layout-wrapper d-flex">
@@ -386,10 +396,13 @@ export default function ParentSidebarLayout({ children }: Props) {
 
       {/* Toast */}
       {showToast && (
-        <div className={`toast position-fixed bottom-0 end-0 m-3 ${toastType === 'error' ? 'bg-danger' : 'bg-success'} text-white p-3 rounded`}>
-          {toastMessage}
-        </div>
-      )}
+    <div className={`toast position-fixed bottom-0 end-0 m-3 ${toastType === 'error' ? 'bg-danger' : 'bg-success'} text-white p-3 rounded`}>
+      {toastMessage}
+    </div>
+  )}
+
+  <SessionExpiredModal onConfirm={() => handleLogout(false)} />
+
 
       {/* Styles */}
       <style jsx>{`
@@ -434,7 +447,7 @@ export default function ParentSidebarLayout({ children }: Props) {
         @media (max-width: 576px) { .profile-modal-content { padding: 1.5rem; margin: 0 auto; width: 100%; max-width: 95%; } }
         @media (max-width: 767px) { .main-content { padding-top: 80px; } }
         @media (min-width: 768px) { .sidebar { transform: none; z-index: 1050; } .main-content { margin-left: 280px; } }
-      `}</style>
+      `}</style> 
     </div>
   );
 }

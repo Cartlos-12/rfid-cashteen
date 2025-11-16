@@ -43,6 +43,9 @@ export default function DashboardContent() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Clock state
+  const [time, setTime] = useState(new Date());
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -54,8 +57,8 @@ export default function DashboardContent() {
         const itemsRes = await fetch('/api/admin/popular-items');
         const itemsData = await itemsRes.json();
         const mappedItems: ItemData[] = (itemsData.items || []).map((i: any) => ({
-        name: i.item_name, // rename item_name to name
-          sold: Number(i.sold)
+          name: i.item_name,
+          sold: Number(i.sold),
         }));
         setItems(mappedItems);
 
@@ -71,10 +74,14 @@ export default function DashboardContent() {
     fetchData();
   }, []);
 
-  // Sort items descending by sold just in case
+  // Update clock every second
+  useEffect(() => {
+    const interval = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const sortedItems = [...items].sort((a, b) => b.sold - a.sold);
 
-  // Chart data
   const barData = {
     labels: sortedItems.map((i) => i.name),
     datasets: [
@@ -121,22 +128,44 @@ export default function DashboardContent() {
         <p className="text-center text-muted py-5">Loading dashboard...</p>
       ) : (
         <>
-          {/* --- METRIC CARDS --- */}
-          <div className="d-flex flex-wrap text-black justify-content-start gap-3 mb-4">
-            {cards.map((card) => (
-              <div key={card.title} className="flex-grow-1 flex-shrink-1" style={{ minWidth: '220px', maxWidth: '250px' }}>
-                <div className={`d-flex align-items-center p-4 rounded-4 shadow-sm ${card.bg}`} style={{ minHeight: '130px', transition: 'transform 0.2s' }}>
-                  <div className="me-3 d-flex align-items-center justify-content-center rounded-circle" style={{ width: '60px', height: '60px' }}>
-                    {card.icon}
-                  </div>
-                  <div className="flex-grow-1">
-                    <h6 className="mb-1 fw-semibold text-muted">{card.title}</h6>
-                    <p className="mb-0 fw-bold fs-5">{card.value}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+          {/* Clock */}
+          <div className="d-flex justify-content-end mb-3">
+            <div className="p-2 rounded-4 shadow-sm bg-primary fw-bold">
+              {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </div>
           </div>
+
+          {/* Metric Cards - Responsive & Aligned */}
+<div className="d-flex flex-wrap justify-content-between gap-3 mb-4 text-dark">
+  {cards.map((card) => (
+    <div
+      key={card.title}
+      className="flex-grow-1 flex-shrink-1"
+      style={{
+        minWidth: '200px', // minimum width per card
+        maxWidth: 'calc(20% - 12px)', // evenly divide space for 5 cards minus gap
+      }}
+    >
+      <div
+        className={`d-flex align-items-center p-4 rounded-4 shadow-sm ${card.bg}`}
+        style={{ minHeight: '130px', transition: 'transform 0.2s' }}
+      >
+        <div
+          className="me-3 d-flex align-items-center justify-content-center rounded-circle"
+          style={{ width: '60px', height: '60px' }}
+        >
+          {card.icon}
+        </div>
+        <div className="flex-grow-1">
+          <h6 className="mb-1 fw-semibold text-muted">{card.title}</h6>
+          <p className="mb-0 fw-bold fs-5">{card.value}</p>
+        </div>
+      </div>
+    </div>
+  ))}
+</div>
+
+
 
           {/* --- CHARTS SECTION --- */}
           <div className="row mb-0 gx-4">
@@ -166,48 +195,37 @@ export default function DashboardContent() {
           {/* --- RECENT TRANSACTIONS --- */}
 <div className="card shadow-sm p-3 mb-4">
   <h5 className="card-title fw-semibold mb-3">Recent Transactions</h5>
+
   {transactions.length === 0 ? (
     <p className="text-center text-muted py-4">No recent transactions found.</p>
   ) : (
     <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-      <table className="table table-hover align-middle">
-        <thead className="table-light">
-          <tr style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: '#f8f9fa' }}>
+      <table className="table table-hover table-striped align-middle mb-0">
+        <thead className="table-light text-center">
+          <tr style={{ position: 'sticky', top: 0, zIndex: 2 }}>
             <th>Student</th>
             <th>Item</th>
             <th>Date</th>
-            <th>Status</th>
           </tr>
         </thead>
-        <tbody>
-          {transactions
-            .slice(0, 10) // Limit to 10 recent transactions
-            .map((tx: Transaction) =>
-              tx.items.map((it, idx) => (
-                <tr key={`${tx.id}-${it.id}`}>
-                  {idx === 0 && (
-                    <>
-                      <td rowSpan={tx.items.length}>{tx.user_name}</td>
-                    </>
-                  )}
-                  <td>{it.item_name} (x{it.quantity})</td>
-                  {idx === 0 && (
-                    <td rowSpan={tx.items.length}>{new Date(tx.created_at).toLocaleString()}</td>
-                  )}
-                  <td>
-                    <span className={`badge ${it.voided ? 'bg-danger' : 'bg-success'}`}>
-                      {it.voided ? 'Voided' : 'Normal'}
-                    </span>
-                  </td>
-                </tr>
-              ))
-            )}
+        <tbody className=" text-center">
+          {transactions.slice(0, 10).map((tx: Transaction) =>
+            tx.items.map((it, idx) => (
+              <tr key={`${tx.id}-${it.id}`}>
+                {/* Only show student and date on the first row of each transaction */}
+                {idx === 0 && <td rowSpan={tx.items.length}>{tx.user_name}</td>}
+                <td>{it.item_name} (x{it.quantity})</td>
+                {idx === 0 && (
+                  <td rowSpan={tx.items.length}>{new Date(tx.created_at).toLocaleString()}</td>
+                )}
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>
   )}
 </div>
-
         </>
       )}
     </div>

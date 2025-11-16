@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     const total = cart.reduce((sum: number, i: any) => sum + i.price * i.quantity, 0);
     await conn.beginTransaction();
 
-    // 🔹 Fetch user info including balance, daily limit, spent_today, and last_reset
+    // 🔹 Fetch user info
     const [userRows]: any = await conn.query(
       "SELECT id, name, email, balance, daily_limit, spent_today, last_reset FROM users WHERE id = ?",
       [customerId]
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
     // 🔹 Reset spent_today if last_reset was before today
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // midnight today
+    today.setHours(0, 0, 0, 0);
 
     if (!lastReset || lastReset < today) {
       spentToday = 0;
@@ -46,13 +46,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // 🔹 Check balance
+    // 🔹 Check balance & daily limit
     if (total > currentBalance) {
       await conn.rollback();
       return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
     }
-
-    // 🔹 Check daily limit
     if (dailyLimit > 0 && spentToday + total > dailyLimit) {
       await conn.rollback();
       return NextResponse.json({
@@ -60,31 +58,38 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // 🔹 Deduct balance and update spent_today atomically
+    // 🔹 Deduct balance & update spent_today
     await conn.query(
       "UPDATE users SET balance = balance - ?, spent_today = spent_today + ?, last_reset = NOW() WHERE id = ?",
       [total, total, customerId]
     );
 
-    // 🔹 Save transactions
-    const transactionPromises = cart.map((item: any) =>
-      conn.query(
-        "INSERT INTO transactions (user_id, user_name, item_id, item_name, quantity, price, total, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())",
-        [customerId, customerName, item.id, item.name, item.quantity, item.price, item.price * item.quantity]
-      )
-    );
-    await Promise.all(transactionPromises);
+    // 🔹 Generate base receipt ID
+    const receiptId = `TX-${Date.now()}`;
 
+    // 🔹 Insert transactions using unique ID per item
+    const transactionPromises = cart.map((item: any, index: number) => {
+      const transactionId = `${receiptId}-${index + 1}`; // unique for each item
+      return conn.query(
+        `INSERT INTO transactions 
+         (id, user_id, user_name, item_id, item_name, quantity, price, total, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
+        [transactionId, customerId, customerName, item.id, item.name, item.quantity, item.price, item.price * item.quantity]
+      );
+    });
+
+    await Promise.all(transactionPromises);
     await conn.commit();
 
     // 🔹 Send email receipt
     if (customerEmail) {
-      await sendPurchaseEmail(customerEmail, customerName, cart, total, currentBalance - total);
+      await sendPurchaseEmail(customerEmail, customerName, cart, total, currentBalance - total, receiptId);
     }
 
     return NextResponse.json({
       success: true,
       message: "Checkout successful",
+      receiptId,
       newBalance: currentBalance - total,
       spentToday: spentToday + total,
       remainingLimit: dailyLimit > 0 ? dailyLimit - (spentToday + total) : null,
@@ -99,8 +104,8 @@ export async function POST(req: Request) {
   }
 }
 
-// 🔹 Email function (unchanged)
-async function sendPurchaseEmail(to: string, name: string, cart: any[], total: number, newBalance: number) {
+// 🔹 Email function with receiptId
+async function sendPurchaseEmail(to: string, name: string, cart: any[], total: number, newBalance: number, receiptId: string) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
 
   const transporter = nodemailer.createTransport({
@@ -130,6 +135,7 @@ async function sendPurchaseEmail(to: string, name: string, cart: any[], total: n
     <div style="max-width:600px;margin:auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
       <div style="background:#007bff;color:#fff;padding:16px;text-align:center;">
         <h2 style="margin:8px 0 0;font-size:22px;">RFID CashTeen Receipt</h2>
+        <p style="margin:0;font-size:14px;">Receipt ID: ${receiptId}</p>
       </div>
       <div style="padding:24px;">
         <p>Hello <strong>${name}</strong>,</p>
@@ -157,7 +163,7 @@ async function sendPurchaseEmail(to: string, name: string, cart: any[], total: n
   await transporter.sendMail({
     from: `"RFID CashTeen System" <${process.env.SMTP_USER}>`,
     to,
-    subject: "Purchase Receipt - RFID CashTeen",
+    subject: `Purchase Receipt - RFID CashTeen (${receiptId})`,
     html,
   });
 }

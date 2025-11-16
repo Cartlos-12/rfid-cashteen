@@ -30,6 +30,7 @@ export default function UsersLogPage() {
     delete: ['delete item'],
     update: ['update item'],
     'confirm payment': ['confirm payment'],
+    'confirm payment success': ['confirm payment success'],
     void: ['void_item'], // ✅ new category for void actions
   };
 

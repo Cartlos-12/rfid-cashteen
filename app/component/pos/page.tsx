@@ -4,11 +4,71 @@ import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReceiptPage, { ReceiptData } from "../../component/receipt/page";
 
+
+interface CircularLoaderProps {
+  progress?: number; // 0-100
+  size?: number;
+  strokeWidth?: number;
+  logoSrc?: string;
+}
+
+export const CircularLoader: React.FC<CircularLoaderProps> = ({
+  progress = 0,
+  size = 120,
+  strokeWidth = 8,
+  logoSrc,
+}) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (progress / 100) * circumference;
+
+  
+  return (
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: size, height: size }}
+    >
+      <svg width={size} height={size}>
+        <circle
+          stroke="#e5e7eb"
+          fill="transparent"
+          strokeWidth={strokeWidth}
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+        />
+        <circle
+          stroke="#10b981"
+          fill="transparent"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 0.3s ease" }}
+        />
+      </svg>
+      {logoSrc && (
+        <img
+          src={logoSrc}
+          alt="logo"
+          className="absolute"
+          style={{ width: size / 2, height: size / 2, opacity: 0.2 }}
+        />
+      )}
+    </div>
+  );
+};
 // Updated system log function to match your database schema
 const logSystemAccess = (user: { id: string; name: string; role: string }, action: string, details: string) => {
   console.log(`[SYSTEM LOG] UserID: ${user.id}, UserName: ${user.name}, Role: ${user.role}, Action: ${action}, Details: ${details}`);
   
   // Send log to your backend API to insert into the logs table
+
+  
+
 
 fetch("/api/admin/user-logs", {
     method: "POST",
@@ -139,8 +199,16 @@ const fetchItemsFromAPI = async () => {
     logSystemAccess(currentUser, "Add to Cart", `Added "${item.name}" to cart`);
   };
 
-  const removeFromCart = (id) => setCart(prev => prev.filter(i => i.id !== id));
+  
   const getTotal = () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  const removeFromCart = (id: number) => {
+  setCart(prev => prev.filter(i => i.id !== id));
+  const removedItem = cart.find(i => i.id === id);
+  if (removedItem) {
+    logSystemAccess(currentUser, "Remove from Cart", `Removed "${removedItem.name}" from cart`);
+  }
+};
 
   // Checkout
   const handleCheckout = () => {
@@ -232,63 +300,75 @@ const fetchCustomer = async (rfid: string) => {
 };
 
   const confirmPayment = async () => {
-    if (!customer || paymentItems.length === 0) return;
+  if (!customer || paymentItems.length === 0) return;
 
-    logSystemAccess(currentUser, "Confirm Payment", `Processing payment of ₱${getTotal().toFixed(2)} for ${customer.name}`);
-    setLoadingPayment(true);
+  logSystemAccess(
+    currentUser,
+    "Confirm Payment",
+    `Processing payment of ₱${getTotal().toFixed(2)} for ${customer.name}`
+  );
 
-    const checkoutPayload = { customerId: customer.id, cart: paymentItems };
+  setLoadingPayment(true);
 
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(checkoutPayload),
-      });
+  const checkoutPayload = { customerId: customer.id, cart: paymentItems };
 
-      const data = await res.json();
+  try {
+    const res = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(checkoutPayload),
+    });
 
-if (!res.ok) {
-  if (data.error === "EXCEEDED_LIMIT") {
-    setShowExceededLimitModal(true);
-  } else if (data.error === "LOW_BALANCE") {
-    setShowLowBalanceModal(true);
-  } else if (data.error === "INVALID_RFID") {
-    setShowInvalidModal(true);
-  } else {
-    setErrorMessage(data.error || "Checkout failed.");
-    setShowFailureModal(true);
-  }
-  return;
-}
+    const data = await res.json();
 
-      
-
-      const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      const payload: ReceiptData = {
-        id: `TX-${Date.now()}`,
-        customerName: customer.name,
-        oldBalance: customer.balance || 0,
-        newBalance: data.newBalance,
-        items: cart,
-        total,
-        date: new Date().toLocaleString(),
-      };
-
-      setCart([]);
-      setShowRFIDModal(false);
-      setCustomer({ ...customer, balance: data.newBalance });
-      setReceiptData(payload);
-      setShowReceiptModal(true);
-
-      logSystemAccess(currentUser, "Confirm Payment Success", `Payment successful. New balance: ₱${data.newBalance}`);
-    } catch (err: any) {
-      setShowFailureModal(true);
-      setErrorMessage(err.message || "Checkout failed.");
-    } finally {
-      setLoadingPayment(false);
+    if (!res.ok) {
+      switch (data.error) {
+        case "EXCEEDED_LIMIT":
+          setShowExceededLimitModal(true);
+          break;
+        case "LOW_BALANCE":
+          setShowLowBalanceModal(true);
+          break;
+        case "INVALID_RFID":
+          setShowInvalidModal(true);
+          break;
+        default:
+          setErrorMessage(data.error || "Checkout failed.");
+          setShowFailureModal(true);
+      }
+      return; // exit after handling error
     }
-  };
+
+    // ✅ Payment success
+    const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const payload: ReceiptData = {
+      id: `TX-${Date.now()}`,
+      customerName: customer.name,
+      oldBalance: customer.balance || 0,
+      newBalance: data.newBalance,
+      items: cart,
+      total,
+      date: new Date().toLocaleString(),
+    };
+
+    setCart([]);
+    setCustomer({ ...customer, balance: data.newBalance });
+    setReceiptData(payload);
+    setShowReceiptModal(true);
+
+    logSystemAccess(
+      currentUser,
+      "Confirm Payment Success",
+      `Payment successful. New balance: ₱${data.newBalance}`
+    );
+  } catch (err: any) {
+    setErrorMessage(err?.message || "Checkout failed.");
+    setShowFailureModal(true);
+  } finally {
+    setLoadingPayment(false); // ✅ safely remove skeleton
+  }
+};
+
 
   // Add, Edit, Delete Item handlers (existing code)
   // --- Modify handleAddItem ---
@@ -466,9 +546,9 @@ const handleDeleteItem = async () => {
             <table className="table table-sm table-hover mb-0">
               <thead className="sticky-top bg-light border-bottom">
                 <tr>
-                  <th style={{ width: '40%' }}>Item</th>
-                  <th style={{ width: '20%' }}>Qty</th>
-                  <th>Price</th>
+                  <th className="fs-5" style={{ width: '35%', paddingLeft: '35px' }}>Item</th>
+                  <th className="fs-5" style={{ width: '35%', paddingLeft: '20px' }}>Qty</th>
+                  <th className="fs-5" style={{paddingLeft: '15px'}}>Price</th>
                   <th></th>
                 </tr>
               </thead>
@@ -476,10 +556,45 @@ const handleDeleteItem = async () => {
                 {cart.length === 0 ? <tr><td colSpan={4} className="text-center text-muted py-5"><i className="bi bi-cart-x fs-1"></i><div>No items in cart</div></td></tr>
                   : cart.map(item => (
                     <tr key={item.id} className="cart-item">
-                      <td className="text-start">{item.name}</td>
-                      <td>{item.quantity}</td>
-                      <td>₱{(item.price * item.quantity).toFixed(2)}</td>
-                      <td><button className="btn btn-sm btn-outline-danger" onClick={() => removeFromCart(item.id)}>Remove</button></td>
+                      <td className="text-start fs-5">{item.name}</td>
+                      <td>
+  <div className="d-flex align-items-center gap-2 fs-5">
+    <button
+      className="btn btn-sm btn-outline-secondary"
+      onClick={() =>
+        setCart(prev =>
+          prev.map(i =>
+            i.id === item.id
+              ? { ...i, quantity: i.quantity > 1 ? i.quantity - 1 : 1 }
+              : i
+          )
+        )
+      }
+    >
+      -
+    </button>
+    <span>{item.quantity}</span>
+    <button
+      className="btn btn-sm btn-outline-secondary"
+      onClick={() =>
+        setCart(prev =>
+          prev.map(i =>
+            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+          )
+        )
+      }
+    >
+      +
+    </button>
+  </div>
+</td>
+
+                      <td className="fw-bold fs-5">₱{(item.price * item.quantity).toFixed(2)}</td>
+                      <td>
+                        <button className="btn btn-sm btn-outline-danger" style={{marginLeft: '40px'}} onClick={() => removeFromCart(item.id)}>
+                          Remove
+                        </button>                       
+                      </td>
                     </tr>
                   ))
                 }
@@ -487,8 +602,8 @@ const handleDeleteItem = async () => {
             </table>
           </div>
           <div className="position-sticky bottom-5 bg-light p-3 border-top shadow-sm" style={{ borderRadius: "8px" }}>
-            <div className="d-flex justify-content-between mb-2"><strong>Total:</strong><strong className="text-success">₱{getTotal().toFixed(2)}</strong></div>
-            <button className="btn btn-success w-100 py-2 fs-6" onClick={handleCheckout}>Checkout</button>
+            <div className="d-flex justify-content-between mb-2 fs-5"><strong>Total:</strong><strong className="text-success fs-5">₱{getTotal().toFixed(2)}</strong></div>
+            <button className="btn btn-success w-100 py-2 fs-5 fw-bold" onClick={handleCheckout}>Checkout</button>
           </div>
         </div>
       </div>
@@ -740,14 +855,17 @@ const handleDeleteItem = async () => {
         <div className="modal-footer d-flex justify-content-between">
           <button className="btn btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
           <button
-            className="btn btn-success"
-            onClick={() => {
-              confirmPayment(); // Use paymentItems from state
-              setShowPaymentModal(false);
-            }}
-          >
-            Confirm
-          </button>
+  className="btn btn-success"
+  onClick={async () => {
+    await confirmPayment(); // wait for payment to finish
+    // Optionally close payment modal only if payment succeeded
+    setShowPaymentModal(false); 
+  }}
+  disabled={loadingPayment} // prevent double click
+>
+  {loadingPayment ? "Processing..." : "Confirm"}
+</button>
+
         </div>
       </div>
     </div>
@@ -780,46 +898,43 @@ const handleDeleteItem = async () => {
           </div>
         </div>
       )}
-      {/* Exceeded Daily Limit Modal */}     
-{showReceiptModal && receiptData && (
+
+      {showReceiptModal && (
   <div
     className="modal d-block"
     style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 2000 }}
   >
     <div className="modal-dialog modal-dialog-centered modal-lg">
-        {loadingPayment ? (
-          <div className="p-3">
-            <div
-              className="skeleton"
-              style={{ width: "80%", height: "25px", marginBottom: "10px" }}
-            />
-            <div
-              className="skeleton"
-              style={{ width: "60%", height: "20px", marginBottom: "5px" }}
-            />
-            <div
-              className="skeleton"
-              style={{ width: "90%", height: "150px", marginBottom: "10px" }}
-            />
-            <div
-              className="skeleton"
-              style={{ width: "40%", height: "20px", marginBottom: "5px" }}
-            />
+      {loadingPayment || !receiptData ? (
+        // Skeleton loading
+        <div className="p-5 d-flex flex-column align-items-center justify-content-center">
+          <div className="w-100" style={{ maxWidth: '500px' }}>
+            <div className="skeleton h-6 mb-3 rounded"></div>
+            <div className="skeleton h-6 mb-3 rounded"></div>
+            <div className="skeleton h-40 mb-3 rounded"></div>
+            <div className="skeleton h-6 mb-2 rounded"></div>
+            <div className="skeleton h-6 mb-2 rounded"></div>
+            <div className="skeleton h-6 mb-2 rounded"></div>
+            <div className="skeleton h-6 mb-2 rounded"></div>
           </div>
-        ) : (
-          <ReceiptPage
-            data={receiptData}
-            onClose={() => {
-              setShowReceiptModal(false);
-              setReceiptData(null);
-              setShowPaymentModal(false);
-              setCustomer(null);
-            }}
-          />
-        )}    
+          <p className="mt-3 text-muted">Generating receipt...</p>
+        </div>
+      ) : (
+        <ReceiptPage
+          data={receiptData}
+          onClose={() => {
+            setShowReceiptModal(false);
+            setReceiptData(null);
+            setShowPaymentModal(false);
+            setCustomer(null);
+          }}
+        />
+      )}
     </div>
   </div>
 )}
+
+
 
 
       {/* Success Modal */}

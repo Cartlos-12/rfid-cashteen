@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import React from 'react';
 import { Search } from 'react-bootstrap-icons';
 
 type Transaction = {
@@ -30,16 +31,15 @@ export default function TransactionHistoryPage() {
       if (res.ok && data.success) {
         setTransactions(data.transactions);
         setTotalPages(data.totalPages);
-        setAnimateContent(true); // trigger fade-in
       } else {
         setTransactions([]);
         setTotalPages(1);
-        setAnimateContent(true);
       }
     } catch (err) {
       console.error(err);
       setTransactions([]);
       setTotalPages(1);
+    } finally {
       setAnimateContent(true);
     }
   };
@@ -67,6 +67,27 @@ export default function TransactionHistoryPage() {
     );
   });
 
+  // === Group and sort transactions by date outside JSX ===
+  const groupedTransactions: { date: string; items: Transaction[] }[] = (() => {
+    const groups: Record<string, Transaction[]> = {};
+    filteredTransactions.forEach(tx => {
+      const dateOnly = new Date(tx.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' });
+      if (!groups[dateOnly]) groups[dateOnly] = [];
+      groups[dateOnly].push(tx);
+    });
+
+    const todayStr = new Date().toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' });
+    return Object.entries(groups)
+      .sort(([a], [b]) => {
+        if (a === todayStr && b !== todayStr) return -1;
+        if (b === todayStr && a !== todayStr) return 1;
+        const [aM, aD, aY] = a.split('/').map(Number);
+        const [bM, bD, bY] = b.split('/').map(Number);
+        return new Date(bY, bM - 1, bD).getTime() - new Date(aY, aM - 1, aD).getTime();
+      })
+      .map(([date, items]) => ({ date, items }));
+  })();
+
   return (
     <div className="position-relative" style={{ minHeight: '70vh' }}>
       <div className={`transition-container ${animateContent ? 'fade-in-container' : ''}`}>
@@ -89,9 +110,9 @@ export default function TransactionHistoryPage() {
         <div className="shadow-sm border rounded table-container" style={{ maxHeight: '580px', overflowY: 'auto', backgroundColor: '#fff' }}>
           {/* Desktop Table */}
           <div className="d-none d-sm-block table-responsive">
-            <table className="table table-hover mb-0 align-middle" style={{ tableLayout: 'fixed', minWidth: '600px', width: '100%' }}>
+             <table className="table table-hover mb-0 align-middle" style={{ tableLayout: 'fixed', minWidth: '600px', width: '100%' }}>
               <thead className="table-header position-sticky top-0 shadow-sm">
-                <tr className="text-center">
+                <tr className="text-center" style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#cfe2ff' }}>
                   <th className="py-3">Transaction ID</th>
                   <th className="py-3">Amount</th>
                   <th className="py-3">Wallet</th>
@@ -99,17 +120,50 @@ export default function TransactionHistoryPage() {
                 </tr>
               </thead>
               <tbody className="text-center">
-                {filteredTransactions.length ? filteredTransactions.map((tx, index) => (
-                  <tr key={tx.id} className="align-middle fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
-                    <td className="fw-semibold">{tx.id}</td>
-                    <td className="text-success fw-semibold">₱{tx.amount.toFixed(2)}</td>
-                    <td>{tx.wallet}</td>
-                    <td>{new Date(tx.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</td>
-                  </tr>
-                )) : (
+                {filteredTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-5 text-muted">No transactions found.</td>
                   </tr>
+                ) : (
+                  <>
+                    {groupedTransactions.map(({ date, items }) => (
+                      <React.Fragment key={date}>
+                        {/* Subtle Date Row */}
+                        <tr>
+                          <td colSpan={4} className="p-0">
+                            <div className="d-flex align-items-center" style={{ padding: '8px 0', backgroundColor: '#f8f9fa' }}>
+                              <div
+                                className="mx-auto px-3 py-1"
+                                style={{
+                                  backgroundColor: '#e9ecef',
+                                  borderRadius: '20px',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 500,
+                                  color: '#495057',
+                                }}
+                              >
+                                {date}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Transactions under this date */}
+                        {items.map((tx, index) => (
+                          <tr
+                            key={tx.id}
+                            className="align-middle fade-in"
+                            style={{ animationDelay: `${index * 0.05}s` }}
+                          >
+                            <td className="fw-semibold">{tx.id}</td>
+                            <td className="text-success fw-semibold">₱{tx.amount.toFixed(2)}</td>
+                            <td>{tx.wallet}</td>
+                            <td>{new Date(tx.created_at).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' })}</td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    ))}
+                  </>
                 )}
               </tbody>
             </table>
@@ -176,4 +230,3 @@ export default function TransactionHistoryPage() {
     </div>
   );
 }
-  

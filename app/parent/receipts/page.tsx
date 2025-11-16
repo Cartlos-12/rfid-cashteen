@@ -52,7 +52,22 @@ function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => voi
       {/* Modal content */}
       <div className="modal-dialog modal-dialog-centered position-relative">
         <div className="modal-content p-3" style={{ fontFamily: 'monospace', maxHeight: '90vh', overflowY: 'auto', width: '400px', margin: 'auto', borderRadius: '8px' }}>
-          
+          <img
+        src="/logo.png"
+        alt="logo"
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          opacity: 0.15,  // very subtle
+          width: "50%",
+          pointerEvents: "none",
+          userSelect: "none",
+          zIndex: 0,
+          borderRadius: "100px",
+        }}
+      />
           {/* Header */}
           <div className="modal-header justify-content-center position-relative">
             <h5 className="modal-title fw-bold">Invoice</h5>
@@ -142,29 +157,43 @@ export default function ReceiptsPage() {
   }, []);
 
   useEffect(() => {
-    if (!parent?.id) return;
+  if (!parent?.id) return;
 
-    async function fetchTransactions() {
-      try {
-        const res = await fetch("/parent/api/receipts?page=1", { credentials: "include" });
-        if (!res.ok) throw new Error("Failed to fetch transactions");
-        const data: Transaction[] = await res.json();
+  async function fetchTransactions() {
+    try {
+      const res = await fetch("/parent/api/receipts?page=1", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch transactions");
 
-        setTransactions(data.map(tx => ({
-          ...tx,
-          total: Number(tx.total) || 0,
-          items: Array.isArray(tx.items) ? tx.items : [],
-        })));
-        setAnimateContent(true);
-      } catch (err) {
-        console.error(err);
-        setTransactions([]);
-        setAnimateContent(true);
-      }
+      const data: Transaction[] = await res.json();
+
+      setTransactions(
+        data
+          .map(tx => ({
+            ...tx,
+            total: Number(tx.total) || 0,
+            items: Array.isArray(tx.items) ? tx.items : [],
+            dateOnly: new Date(tx.created_at).toLocaleDateString("en-PH", {
+              timeZone: "Asia/Manila",
+            }),
+          }))
+          .sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
+          )
+      );
+
+      setAnimateContent(true);
+    } catch (err) {
+      console.error(err);
+      setTransactions([]);
+      setAnimateContent(true);
     }
+  }
 
-    fetchTransactions();
-  }, [parent]);
+  fetchTransactions();
+}, [parent]);
+
 
   const openReceipt = (tx: Transaction) => {
     setSelectedReceipt({
@@ -188,29 +217,114 @@ export default function ReceiptsPage() {
           <div className="d-none d-sm-block table-responsive">
             <table className="table table-hover mb-0 align-middle" style={{ tableLayout: 'fixed', minWidth: '600px', width: '100%' }}>
               <thead className="table-header sticky-top shadow-sm">
-                <tr className="text-center">
+                <tr className="text-center sticky-top">
                   <th className="py-3">Customer</th>
-                  <th className="py-3">Date</th>
+                  <th className="py-3">Time</th>
                   <th className="py-3">Total</th>
                   <th className="py-3">Action</th>
                 </tr>
               </thead>
               <tbody className="text-center">
-                {transactions.length ? transactions.map((tx, index) => (
-                  <tr key={tx.id} className="align-middle fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
-                    <td className="fw-semibold">{tx.user_name}</td>
-                    <td>{new Date(tx.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</td>
-                    <td className="text-success fw-semibold">₱{tx.total.toFixed(2)}</td>
-                    <td>
-                      <button className="btn btn-sm btn-primary px-3 py-1" onClick={() => openReceipt(tx)}>View</button>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan={4} className="py-5 text-muted">No transactions found.</td>
-                  </tr>
-                )}
-              </tbody>
+  {transactions.length === 0 ? (
+    <tr>
+      <td colSpan={4} className="py-5 text-muted">
+        No transactions found.
+      </td>
+    </tr>
+  ) : (
+    (() => {
+      // Group transactions by dateOnly (should be "en-PH" date string)
+      const groups = transactions.reduce((acc: Record<string, Transaction[]>, tx) => {
+        const date = (tx as any).dateOnly || new Date(tx.created_at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila" });
+        if (!acc[date]) acc[date] = [];
+        acc[date].push(tx);
+        return acc;
+      }, {});
+
+      // Create array of [dateString, items[]]
+      const groupsArr: [string, Transaction[]][] = Object.entries(groups);
+
+      // Convert each dateString to an ISO timestamp for reliable sorting
+      const parseDateToIso = (dateStr: string) => {
+        // dateStr is expected in en-PH (e.g. "11/15/2025") — parse with Date using locale parts
+        const parts = dateStr.split(/[\/\-\.]/).map(p => Number(p));
+        // en-PH -> MM/DD/YYYY or depending on browser; fallback: try Date.parse
+        let iso: number;
+        if (parts.length === 3) {
+          // assume MM/DD/YYYY
+          const [m, d, y] = parts;
+          iso = new Date(y, m - 1, d).getTime();
+        } else {
+          iso = Date.parse(dateStr) || 0;
+        }
+        return iso;
+      };
+
+      // Sort groups so today is first, then by newest date -> oldest
+      const todayStr = new Date().toLocaleDateString("en-PH", { timeZone: "Asia/Manila" });
+      groupsArr.sort(([aDate], [bDate]) => {
+        if (aDate === todayStr && bDate !== todayStr) return -1;
+        if (bDate === todayStr && aDate !== todayStr) return 1;
+        return parseDateToIso(bDate) - parseDateToIso(aDate);
+      });
+
+      // Render groups
+      return groupsArr.map(([date, items], groupIndex) => (
+        <React.Fragment key={date}>
+          <tr>
+  <td colSpan={4} className="p-0">
+    <div
+      className="d-flex align-items-center"
+      style={{
+        padding: "10px 0",
+        backgroundColor: "#f8f9fa",
+      }}
+    >
+      <div
+        className="mx-auto px-3 py-1"
+        style={{
+          backgroundColor: "#e9ecef",
+          borderRadius: "20px",
+          fontSize: "0.85rem",
+          fontWeight: 500,
+          color: "#495057",
+        }}
+      >
+        {date}
+      </div>
+    </div>
+  </td>
+</tr>
+
+
+          {items.map((tx, index) => (
+            <tr
+              key={tx.id}
+              className="align-middle fade-in"
+              style={{ animationDelay: `${(groupIndex + index) * 0.05}s` }}
+            >
+              <td className="fw-semibold">{tx.user_name}</td>
+              <td>
+                {new Date(tx.created_at).toLocaleTimeString("en-PH", {
+                  timeZone: "Asia/Manila",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </td>
+              <td className="text-success fw-semibold">₱{tx.total.toFixed(2)}</td>
+              <td>
+                <button className="btn btn-sm btn-primary px-3 py-1" onClick={() => openReceipt(tx)}>
+                  View
+                </button>
+              </td>
+            </tr>
+          ))}
+        </React.Fragment>
+      ));
+    })()
+  )}
+</tbody>
+
             </table>
           </div>
         </div>
@@ -220,7 +334,7 @@ export default function ReceiptsPage() {
           {transactions.length ? transactions.map((tx, i) => (
             <div key={tx.id} className="mobile-card border rounded shadow-sm mb-3 p-3 fade-in" style={{ backgroundColor: i % 2 === 0 ? '#f8f9fa' : '#ffffff', animationDelay: `${i * 0.05}s` }}>
               <div className="d-flex justify-content-between mb-1"><span className="fw-semibold">Customer:</span><span>{tx.user_name}</span></div>
-              <div className="d-flex justify-content-between mb-1"><span className="fw-semibold">Date:</span><span>{new Date(tx.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</span></div>
+              <div className="d-flex justify-content-between mb-1"><span className="fw-semibold">Time:</span><span>{new Date(tx.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</span></div>
               <div className="d-flex justify-content-between mb-1"><span className="fw-semibold">Total:</span><span className="text-success fw-semibold">₱{tx.total.toFixed(2)}</span></div>
               <button className="btn btn-primary w-100 mt-2" onClick={() => openReceipt(tx)}>View Receipt</button>
             </div>

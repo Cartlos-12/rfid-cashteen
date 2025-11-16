@@ -18,6 +18,7 @@ export default function SpendingLimitPage() {
   const [newLimit, setNewLimit] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [timeLeft, setTimeLeft] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export default function SpendingLimitPage() {
       return;
     }
     if (limitValue > student.balance) {
-      setMessage('❌ Limit cannot exceed current balance.');
+      setMessage('Limit cannot exceed current balance.');
       return;
     }
 
@@ -117,6 +118,31 @@ export default function SpendingLimitPage() {
   const spentToday = student?.spent_today ?? 0;
   const remainingLimit = Math.max(limit - spentToday, 0);
   const limitPercentage = limit > 0 ? (spentToday / limit) * 100 : 0;
+
+  function calculateTimeLeft() {
+  const now = new Date();
+  const midnight = new Date();
+
+  midnight.setHours(24, 0, 0, 0); // Next midnight
+
+  const diff = midnight.getTime() - now.getTime();
+
+  if (diff <= 0) return "0h 0m";
+
+  const hours = Math.floor(diff / 1000 / 60 / 60);
+  const minutes = Math.floor((diff / 1000 / 60) % 60);
+
+  return `${hours}h ${minutes}m`;
+}
+useEffect(() => {
+  const updateTimer = () => setTimeLeft(calculateTimeLeft());
+
+  updateTimer(); // initial load
+
+  const interval = setInterval(updateTimer, 60000); // update every 1 minute
+  return () => clearInterval(interval);
+}, []);
+
 
   return (
     <div className={`fade-in-content ${showContent ? 'fade-in' : ''}`}>
@@ -213,9 +239,13 @@ export default function SpendingLimitPage() {
                   </button>
 
                   <div className="mt-3 text-center text-muted small">
-                    <i className="bi bi-lightbulb text-warning me-1"></i>
-                    Tip: Limit resets daily and cannot exceed balance.
-                  </div>
+  <i className="bi bi-clock-history text-primary me-1"></i>
+  You can edit the limit again in <strong>{timeLeft}</strong>.
+  <br />
+  <i className="bi bi-lightbulb text-warning me-1"></i>
+  Tip: Limit resets daily and cannot exceed balance.
+</div>
+
                 </>
               )}
             </div>

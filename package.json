@@ -17,8 +17,6 @@
     "bootstrap-icons": "^1.13.1",
     "chart.js": "^4.5.0",
     "cors": "^2.8.5",
-    "escpos": "^3.0.0-alpha.6",
-    "escpos-usb": "^3.0.0-alpha.4",
     "express": "^5.1.0",
     "file-saver": "^2.0.5",
     "jsonwebtoken": "^9.0.2",
