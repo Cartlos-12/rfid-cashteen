@@ -94,6 +94,7 @@ export default function CashierPOS() {
   };
 
   const [items, setItems] = useState([]);
+  const [topItems, setTopItems] = useState([]);
   const [cart, setCart] = useState([]);
   const [paymentItems, setPaymentItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(true);
@@ -151,13 +152,21 @@ const fetchItemsFromAPI = async () => {
     setLoadingItems(true);
     const res = await fetch("/api/cashier/items");
     const data = await res.json();
-    const mapped = Array.isArray(data)
-      ? data.map(it => ({ ...it, price: Number(it.price) }))
+
+    const mappedItems = Array.isArray(data.items)
+      ? data.items.map(it => ({ ...it, price: Number(it.price) }))
       : [];
-    setItems(mapped);
+
+    const mappedTop = Array.isArray(data.topItems)
+      ? data.topItems.map(it => ({ ...it, quantity: Number(it.quantity) }))
+      : [];
+
+    setItems(mappedItems);
+    setTopItems(mappedTop); // ✅ store top items
   } catch (err) {
     console.error("Failed to fetch items", err);
     setItems([]);
+    setTopItems([]);
   } finally {
     setLoadingItems(false);
   }
@@ -313,6 +322,7 @@ const fetchCustomer = async (rfid: string) => {
   const checkoutPayload = { customerId: customer.id, cart: paymentItems };
 
   try {
+    // 1️⃣ Send payment request to backend
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -321,6 +331,7 @@ const fetchCustomer = async (rfid: string) => {
 
     const data = await res.json();
 
+    // 2️⃣ Handle possible errors
     if (!res.ok) {
       switch (data.error) {
         case "EXCEEDED_LIMIT":
@@ -336,23 +347,25 @@ const fetchCustomer = async (rfid: string) => {
           setErrorMessage(data.error || "Checkout failed.");
           setShowFailureModal(true);
       }
-      return; // exit after handling error
+      return; // Stop execution if error
     }
 
-    // ✅ Payment success
-    const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    // 3️⃣ SUCCESS: Update customer balance and clear cart
+    const total = paymentItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    setCustomer(prev => prev && { ...prev, balance: data.newBalance });
+    setCart([]);
+    
+    // 4️⃣ Prepare receipt data
     const payload: ReceiptData = {
       id: `TX-${Date.now()}`,
       customerName: customer.name,
       oldBalance: customer.balance || 0,
       newBalance: data.newBalance,
-      items: cart,
+      items: [...paymentItems],
       total,
       date: new Date().toLocaleString(),
     };
-
-    setCart([]);
-    setCustomer({ ...customer, balance: data.newBalance });
     setReceiptData(payload);
     setShowReceiptModal(true);
 
@@ -362,12 +375,14 @@ const fetchCustomer = async (rfid: string) => {
       `Payment successful. New balance: ₱${data.newBalance}`
     );
   } catch (err: any) {
+    console.error("Payment error:", err);
     setErrorMessage(err?.message || "Checkout failed.");
     setShowFailureModal(true);
   } finally {
-    setLoadingPayment(false); // ✅ safely remove skeleton
+    setLoadingPayment(false);
   }
 };
+
 
 
   // Add, Edit, Delete Item handlers (existing code)

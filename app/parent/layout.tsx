@@ -15,6 +15,7 @@ interface Props {
   children: ReactNode;
 }
 
+
 export default function ParentLayout({ children }: Props) {
   const [student, setStudent] = useState<Student | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -62,18 +63,18 @@ export default function ParentLayout({ children }: Props) {
   // Render sidebar immediately, show loader in main content until authenticated
   return (
     <ParentSidebarLayout student={student}>
-      {isAuthenticated === null ? (
-        <div className="text-center py-5 text-muted">
-          <div className="spinner-border text-primary me-2" role="status"></div>
-          Loading student info...
-        </div>
-      ) : isAuthenticated ? (
-        children
-      ) : (
-        <div className="text-center py-5 text-danger">
-          Please <a href="/parent/login">login</a>.
-        </div>
-      )}
-    </ParentSidebarLayout>
+  {isAuthenticated === null ? (
+    <div className="text-center py-5 text-muted">
+      <div className="spinner-border text-primary me-2" role="status"></div>
+      Loading student info...
+    </div>
+  ) : isAuthenticated ? (
+    children
+  ) : (
+    <div className="text-center py-5 text-danger">
+      Please <a href="/parent/login">login</a>.
+    </div>
+  )}
+</ParentSidebarLayout>
   );
 }

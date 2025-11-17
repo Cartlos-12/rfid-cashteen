@@ -25,6 +25,7 @@ type Student = {
 };
 
 interface Props {
+  student: Student | null;
   children: ReactNode;
 }
 

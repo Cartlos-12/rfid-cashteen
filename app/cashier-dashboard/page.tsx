@@ -39,44 +39,45 @@ export default function CashierDashboard() {
   // Function declarations
   // ------------------------
   async function fetchItemsForToday() {
-    try {
-      const res = await fetch("/api/cashier/items");
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const items: Item[] = await res.json();
-      if (!Array.isArray(items)) throw new Error("API did not return an array");
+  try {
+    const res = await fetch("/api/cashier/items");
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const data = await res.json();
 
-      const now = new Date();
-      const hours = now.getHours();
-      const todayCategory = hours < 12 ? "Food Pack A" : "Food Pack B";
+    const items: Item[] = Array.isArray(data.items) ? data.items : [];
+    const topItems = Array.isArray(data.topItems) ? data.topItems : [];
 
-      // Filter items to include only today's food pack + all other categories
-      const filteredItems = items.filter(item => {
-        if (!item || typeof item.category !== "string") return false;
-        if (todayCategory === "Food Pack A" && item.category === "Food Pack B") return false;
-        if (todayCategory === "Food Pack B" && item.category === "Food Pack A") return false;
-        return true;
-      });
+    // Filter Food Pack A/B depending on AM/PM
+    const now = new Date();
+    const hours = now.getHours();
+    const showCategory = hours < 12 ? "Food Pack A" : "Food Pack B";
 
-      const sanitizedItems = filteredItems
-        .map(item => ({
-          id: Number(item.id) || 0,
-          name: String(item.name || "Unknown"),
-          price: Number(item.price) || 0,
-          category: String(item.category || "Other"),
-          created_at: String(item.created_at || ""),
-        }))
-        .sort((a, b) => {
-          const aIndex = categoryOrder.indexOf(a.category);
-          const bIndex = categoryOrder.indexOf(b.category);
-          return aIndex - bIndex;
-        });
+    const filteredItems = items.filter(item => {
+      // Always include non-Food Pack A/B items
+      if (item.category !== "Food Pack A" && item.category !== "Food Pack B") return true;
+      // Include only the correct food pack
+      return item.category === showCategory;
+    });
+    
 
-      setAvailableItems(sanitizedItems);
-    } catch (err) {
-      console.error("Failed to fetch items:", err);
-      setAvailableItems([]);
+    // Optional: sort by category order
+    const categoryOrder = ["Food Pack A", "Food Pack B", "Food", "Drink", "Snack", "Other"];
+    const sortedItems = filteredItems.sort(
+      (a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category)
+    );
+
+    setAvailableItems(sortedItems);
+
+    if (topItems.length > 0) {
+      setSalesSummary(prev => ({ ...prev, topItems }));
     }
+  } catch (err) {
+    console.error("Failed to fetch items:", err);
+    setAvailableItems([]);
   }
+}
+
+
 
   async function fetchTransactionsForToday() {
     try {
@@ -287,20 +288,22 @@ export default function CashierDashboard() {
               </div>
 
               <div className="col-md-4 mb-3">
-                <div className="card text-white h-100" style={{ backgroundColor: '#ffc107', color: '#000' }}>
-                  <div className="card-body">
-                    <h5 className="card-title">Top Items</h5>
-                    <ul className="list-unstyled mb-0">
-                      {salesSummary.topItems.map((item, index) => (
-                        <li key={index} style={{ fontWeight: 500 }}>
-                          {item.name} ({item.quantity})
-                        </li>
-                      ))}
-                      {salesSummary.topItems.length === 0 && <li>No sales yet</li>}
-                    </ul>
-                  </div>
-                </div>
-              </div>
+  <div className="card text-white h-100" style={{ backgroundColor: '#ffc107', color: '#000' }}>
+    <div className="card-body">
+      <h5 className="card-title">Top Item</h5>
+      <ul className="list-unstyled mb-0">
+        {salesSummary.topItems && salesSummary.topItems.length > 0 ? (
+          <li style={{ fontWeight: 500 }}>
+            {salesSummary.topItems[0].name} ({salesSummary.topItems[0].quantity})
+          </li>
+        ) : (
+          <li>No sales yet</li>
+        )}
+      </ul>
+    </div>
+  </div>
+</div>
+
             </div>
 
             <p className="fw-bold fs-4">Available items for today:</p>

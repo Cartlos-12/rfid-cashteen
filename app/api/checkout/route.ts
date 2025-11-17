@@ -64,21 +64,22 @@ export async function POST(req: Request) {
       [total, total, customerId]
     );
 
-    // 🔹 Generate base receipt ID
-    const receiptId = `TX-${Date.now()}`;
+    // 🔹 Generate a unique receipt ID
+     const receiptId = `TX-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-    // 🔹 Insert transactions using unique ID per item
-    const transactionPromises = cart.map((item: any, index: number) => {
-      const transactionId = `${receiptId}-${index + 1}`; // unique for each item
-      return conn.query(
-        `INSERT INTO transactions 
-         (id, user_id, user_name, item_id, item_name, quantity, price, total, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())`,
-        [transactionId, customerId, customerName, item.id, item.name, item.quantity, item.price, item.price * item.quantity]
-      );
-    });
+    // 🔹 Insert transactions using the receipt ID
+    const transactionPromises = cart.map((item: any) => {
+  const transactionId = `TX-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+  return conn.query(
+    `INSERT INTO transactions 
+     (id, user_id, user_name, item_id, item_name, quantity, price, total, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+    [transactionId, customerId, customerName, item.id, item.name, item.quantity, item.price, item.price * item.quantity]
+  );
+});
 
     await Promise.all(transactionPromises);
+
     await conn.commit();
 
     // 🔹 Send email receipt

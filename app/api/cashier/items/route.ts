@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server"; 
 import pool from "../../../lib/db";
 
 // Helper: Log user actions
@@ -18,13 +18,25 @@ async function logUserAction(
   }
 }
 
-// ------------------ GET items ------------------
-// Cashier fetch
+// ------------------ GET items + top items ------------------
 export async function GET() {
   try {
-    const [rows] = await pool.query("SELECT * FROM items ORDER BY created_at DESC");
-    const items = Array.isArray(rows) ? rows : [];
-    return NextResponse.json(items); // return array directly
+    // Fetch all items
+    const [itemsRows] = await pool.query("SELECT * FROM items ORDER BY created_at DESC");
+    const items = Array.isArray(itemsRows) ? itemsRows : [];
+
+    // Fetch top-selling items (adjust table/column names to match your schema)
+    const [topItemsRows] = await pool.query(`
+      SELECT i.name, SUM(t.quantity) AS quantity
+      FROM items i
+      JOIN transactions t ON i.id = t.item_id
+      GROUP BY i.id
+      ORDER BY quantity DESC
+      LIMIT 5
+    `);
+    const topItems = Array.isArray(topItemsRows) ? topItemsRows : [];
+
+    return NextResponse.json({ items, topItems });
   } catch (err) {
     console.error("Error fetching items:", err);
     return NextResponse.json({ error: "Failed to fetch items" }, { status: 500 });
@@ -54,7 +66,6 @@ export async function GET_BY_NAME(req: NextRequest) {
   }
 }
 
-
 // ------------------ POST new item ------------------
 export async function POST(req: NextRequest) {
   try {
@@ -69,7 +80,6 @@ export async function POST(req: NextRequest) {
       [name, price, category || null]
     );
 
-    // Log cashier action
     await logUserAction(userId, userName, "Add Item", `Added "${name}" (₱${price})`);
 
     return NextResponse.json({ success: true, id: result.insertId, item: { id: result.insertId, name, price, category } });
@@ -95,7 +105,6 @@ export async function PUT(req: NextRequest) {
       id,
     ]);
 
-    // Log cashier action
     await logUserAction(userId, userName, "Update Item", `Updated "${name}" (₱${price})`);
 
     return NextResponse.json({ success: true, item: { id, name, price, category } });
@@ -106,7 +115,6 @@ export async function PUT(req: NextRequest) {
 }
 
 // ------------------ DELETE item ------------------
-// ------------------ DELETE item by name ------------------
 export async function DELETE(req: NextRequest) {
   try {
     const { userId, userName, name } = await req.json();
@@ -122,7 +130,6 @@ export async function DELETE(req: NextRequest) {
 
     await pool.query("DELETE FROM items WHERE name = ?", [name]);
 
-    // Log cashier action
     await logUserAction(userId, userName, "Delete Item", `Deleted item "${name}"`);
 
     return NextResponse.json({ success: true });
